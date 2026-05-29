@@ -85,6 +85,37 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+app.post("/api/branches", async (req, res) => {
+  try {
+
+    const { databaseName } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request().query(`
+      SELECT
+          SM1002_5 AS unqid,
+          SM1002_7 AS Branch
+      FROM SM1002
+      ORDER BY SM1002_7
+    `);
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
 
 
 // ─────────────────────────────────────────────────────
