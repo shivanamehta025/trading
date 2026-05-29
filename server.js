@@ -42,7 +42,7 @@ app.post('/api/login', async (req, res) => {
 
         const { userId, password } = req.body;
 
-        const pool = await sql.connect(sqlConfig);
+        const pool = await getPool();
 
         const result = await pool.request()
 
