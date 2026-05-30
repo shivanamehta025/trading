@@ -90,19 +90,23 @@ app.post("/api/branches", async (req, res) => {
 
     const { databaseName } = req.body;
 
+    console.log("DATABASE =", databaseName);
+
     const pool = await getPool(databaseName);
 
     const result = await pool.request().query(`
       SELECT
-          SM1002_5 AS unqid,
-          SM1002_7 AS Branch
+        SM1002_5 AS unqid,
+        SM1002_7 AS Branch
       FROM SM1002
       ORDER BY SM1002_7
     `);
 
+    console.log(result.recordset);
+
     res.json({
       success: true,
-      data: result.recordset
+      data: result.recordset,
     });
 
   } catch (err) {
@@ -111,7 +115,7 @@ app.post("/api/branches", async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: err.message
+      message: err.message,
     });
   }
 });
