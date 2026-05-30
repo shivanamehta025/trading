@@ -120,6 +120,13 @@ app.post("/api/branches", async (req, res) => {
   }
 });
 
+app.get("/api/test", (req, res) => {
+  res.json({
+    success: true,
+    message: "API Updated"
+  });
+});
+
 
 
 // ─────────────────────────────────────────────────────
