@@ -120,6 +120,62 @@ app.post("/api/branches", async (req, res) => {
   }
 });
 
+app.post("/api/pending-challan", async (req, res) => {
+  try {
+
+    const { databaseName, branchId } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input("what", sql.VarChar, "pending_challan")
+      .input("branch", sql.VarChar, branchId)
+      .execute("SP_FOR_SRL");
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+app.post("/api/pending-srl", async (req, res) => {
+  try {
+
+    const { databaseName, branchId } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input("what", sql.VarChar, "PENDING_SRL")
+      .input("branch", sql.VarChar, branchId)
+      .execute("SP_FOR_SRL");
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 app.get("/api/test", (req, res) => {
   res.json({
     success: true,
