@@ -286,6 +286,58 @@ console.log("userId =", userId);
   }
 });
 
+app.post("/api/challan-approval", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName,
+      userId,
+      challanUnq
+    } = req.body;
+
+    const pool =
+      await getPool(databaseName);
+
+    const result =
+      await pool.request()
+
+      .input(
+        "what",
+        sql.VarChar,
+        "challanApproval"
+      )
+
+      .input(
+        "SM1008_32",
+        sql.VarChar,
+        userId
+      )
+
+      .input(
+        "LISTOFUNQID",
+        sql.VarChar,
+        challanUnq
+      )
+
+      .execute("SP_FOR_SRL");
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
 
 app.get("/api/test", (req, res) => {
   res.json({
