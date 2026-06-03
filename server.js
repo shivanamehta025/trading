@@ -189,7 +189,7 @@ app.post("/api/srl-approval", async (req, res) => {
 
     const pool =
       await getPool(databaseName);
-
+console.log("userId =", userId);
     const result =
       await pool.request()
 
@@ -230,6 +230,62 @@ app.post("/api/srl-approval", async (req, res) => {
     });
   }
 });
+
+app.post("/api/srl-reject", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName,
+      userId,
+      system,
+      srlUnq
+    } = req.body;
+
+    const pool =
+      await getPool(databaseName);
+console.log("userId =", userId);
+    const result =
+      await pool.request()
+
+      .input(
+        "what",
+        sql.VarChar,
+        "SRLreject"
+      )
+
+      .input(
+        "SM1016_28",
+        sql.VarChar,
+        userId
+      )
+
+     
+
+      .input(
+        "LISTOFUNQID",
+        sql.VarChar,
+        srlUnq
+      )
+
+      .execute("SP_FOR_SRL");
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
 
 app.get("/api/test", (req, res) => {
   res.json({
