@@ -346,6 +346,95 @@ app.get("/api/test", (req, res) => {
   });
 });
 
+app.post("/api/save-device-token", async (req, res) => {
+
+  try {
+
+    const {
+      userId,
+      token
+    } = req.body;
+
+    if (!userId || !token) {
+
+      return res.status(400).json({
+        success: false,
+        message: "UserId and Token are required"
+      });
+    }
+
+    const pool = await getPool();
+
+    await pool.request()
+
+      .input(
+        "userId",
+        sql.VarChar,
+        userId
+      )
+
+      .input(
+        "token",
+        sql.NVarChar(sql.MAX),
+        token
+      )
+
+      .query(`
+
+        IF EXISTS
+        (
+          SELECT *
+          FROM APP_DEVICE_TOKEN
+          WHERE USERID = @userId
+        )
+        BEGIN
+
+          UPDATE APP_DEVICE_TOKEN
+          SET
+            TOKEN = @token,
+            CREATEDON = GETDATE()
+          WHERE USERID = @userId
+
+        END
+        ELSE
+        BEGIN
+
+          INSERT INTO APP_DEVICE_TOKEN
+          (
+            USERID,
+            TOKEN,
+            CREATEDON
+          )
+          VALUES
+          (
+            @userId,
+            @token,
+            GETDATE()
+          )
+
+        END
+
+      `);
+
+    console.log(
+      `✅ Token Saved for ${userId}`
+    );
+
+    res.json({
+      success: true,
+      message: "Token saved successfully"
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
 
 
 // ─────────────────────────────────────────────────────
