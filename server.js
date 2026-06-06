@@ -351,9 +351,10 @@ app.post("/api/save-device-token", async (req, res) => {
   try {
 
     const {
-      userId,
-      token
-    } = req.body;
+  userId,
+  userName,
+  token
+} = req.body;
 
     if (!userId || !token) {
 
@@ -378,43 +379,48 @@ app.post("/api/save-device-token", async (req, res) => {
         sql.NVarChar(sql.MAX),
         token
       )
+      .input(
+  "userName",
+  sql.VarChar,
+  userName
+)
 
-      .query(`
+     .query(`
 
-        IF EXISTS
-        (
-          SELECT *
-          FROM APP_DEVICE_TOKEN
-          WHERE USERID = @userId
-        )
-        BEGIN
+    IF EXISTS
+    (
+        SELECT *
+        FROM APP_DEVICE_TOKEN
+        WHERE USERID = @userId
+    )
+    BEGIN
 
-          UPDATE APP_DEVICE_TOKEN
-          SET
-            TOKEN = @token,
-            CREATEDON = GETDATE()
-          WHERE USERID = @userId
+        UPDATE APP_DEVICE_TOKEN
+SET
+    USERNAME = @userName,
+    DEVICETOKEN = @token,
+    LASTLOGIN = GETDATE()
 
-        END
-        ELSE
-        BEGIN
+    END
+    ELSE
+    BEGIN
+INSERT INTO APP_DEVICE_TOKEN
+(
+    USERID,
+    USERNAME,
+    DEVICETOKEN,
+    LASTLOGIN
+)
+VALUES
+(
+    @userId,
+    @userName,
+    @token,
+    GETDATE()
+)
+    END
 
-          INSERT INTO APP_DEVICE_TOKEN
-          (
-            USERID,
-            TOKEN,
-            CREATEDON
-          )
-          VALUES
-          (
-            @userId,
-            @token,
-            GETDATE()
-          )
-
-        END
-
-      `);
+`);
 
     console.log(
       `✅ Token Saved for ${userId}`
