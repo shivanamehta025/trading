@@ -1,5 +1,5 @@
 const admin =
-require("../config/firebase");
+require("../firebase");
 
 async function sendNotification(
   token,
