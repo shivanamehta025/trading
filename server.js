@@ -399,11 +399,12 @@ console.log(req.body);
     )
     BEGIN
 
-        UPDATE APP_DEVICE_TOKEN
+      UPDATE APP_DEVICE_TOKEN
 SET
     USERNAME = @userName,
     DEVICETOKEN = @token,
     LASTLOGIN = GETDATE()
+WHERE USERID = @userId
 
     END
     ELSE
