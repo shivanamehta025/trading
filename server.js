@@ -176,6 +176,9 @@ app.post("/api/pending-srl", async (req, res) => {
   }
 });
 
+const sendNotification =
+require("./services/firebaseNotification");
+
 app.post("/api/srl-approval", async (req, res) => {
 
   try {
@@ -189,31 +192,54 @@ app.post("/api/srl-approval", async (req, res) => {
 
     const pool =
       await getPool(databaseName);
-console.log("userId =", userId);
+
     const result =
       await pool.request()
 
-      .input(
-        "what",
-        sql.VarChar,
-        "SRLapproval"
-      )
+      .input("what", sql.VarChar, "SRLapproval")
 
-      .input(
-        "SM1016_28",
-        sql.VarChar,
-        userId
-      )
+      .input("SM1016_28", sql.VarChar, userId)
 
-     
-
-      .input(
-        "LISTOFUNQID",
-        sql.VarChar,
-        srlUnq
-      )
+      .input("LISTOFUNQID", sql.VarChar, srlUnq)
 
       .execute("SP_FOR_SRL");
+
+
+    // ===============================
+    // SEND NOTIFICATION HERE
+    // ===============================
+
+    const cmpyPool =
+      await getPool();
+
+    const tokenResult =
+      await cmpyPool.request()
+
+      .query(`
+        SELECT DEVICETOKEN
+        FROM APP_DEVICE_TOKEN
+        WHERE USERID='SHI'
+      `);
+
+    if (
+      tokenResult.recordset.length > 0
+    ) {
+
+      const token =
+        tokenResult.recordset[0]
+          .DEVICETOKEN;
+
+      await sendNotification(
+
+        token,
+
+        "SRL Approved",
+
+        "Your SRL has been approved."
+      );
+    }
+
+    // ===============================
 
     res.json({
       success: true,
