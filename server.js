@@ -346,6 +346,9 @@ app.get("/api/test", (req, res) => {
   });
 });
 
+
+console.log("BODY RECEIVED");
+console.log(req.body);
 app.post("/api/save-device-token", async (req, res) => {
 
   try {
@@ -356,7 +359,7 @@ app.post("/api/save-device-token", async (req, res) => {
   token
 } = req.body;
 
-    if (!userId || !token) {
+    if (!userId || !userName || !token) {
 
       return res.status(400).json({
         success: false,
