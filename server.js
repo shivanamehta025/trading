@@ -347,11 +347,12 @@ app.get("/api/test", (req, res) => {
 });
 
 
-console.log("BODY RECEIVED");
-console.log(req.body);
+
 app.post("/api/save-device-token", async (req, res) => {
 
   try {
+    console.log("BODY RECEIVED");
+console.log(req.body);
 
     const {
   userId,
