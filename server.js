@@ -218,7 +218,7 @@ app.post("/api/srl-approval", async (req, res) => {
   .query(`
       SELECT sm1016_c3 AS USERID
       FROM sm1016_c
-      WHERE sm1016_c5 = @srlUnq
+      WHERE unqid = @srlUnq
   `);
 
 const targetUserId = srlResult.recordset[0]?.USERID;
