@@ -212,13 +212,26 @@ app.post("/api/srl-approval", async (req, res) => {
     const cmpyPool =
       await getPool();
 
+
+      const srlResult = await pool.request()
+  .input("srlUnq", sql.VarChar, srlUnq)
+  .query(`
+      SELECT sm1016_c3 AS USERID
+      FROM sm1016_c
+      WHERE sm1016_c5 = @srlUnq
+  `);
+
+const targetUserId = srlResult.recordset[0]?.USERID;
+
+console.log("Target User ID:", targetUserId);
+console.log("Sending notification to User:", targetUserId);
     const tokenResult =
       await cmpyPool.request()
-
+ .input("userId", sql.VarChar, targetUserId)
       .query(`
         SELECT DEVICETOKEN
         FROM APP_DEVICE_TOKEN
-        WHERE USERID='SHI'
+        WHERE USERID=@userId
       `);
 
     if (
