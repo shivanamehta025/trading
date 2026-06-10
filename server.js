@@ -130,7 +130,7 @@ app.post("/api/pending-challan", async (req, res) => {
     const result = await pool.request()
       .input("what", sql.VarChar, "pending_challan")
       .input("branch", sql.VarChar, branchId)
-      .execute("SP_FOR_SRL");
+      .execute("A_SP_FOR_SRL_APP");
 
     res.json({
       success: true,
@@ -158,7 +158,7 @@ app.post("/api/pending-srl", async (req, res) => {
     const result = await pool.request()
       .input("what", sql.VarChar, "PENDING_SRL")
       .input("branch", sql.VarChar, branchId)
-      .execute("SP_FOR_SRL");
+      .execute("A_SP_FOR_SRL_APP");
 
     res.json({
       success: true,
@@ -202,7 +202,7 @@ app.post("/api/srl-approval", async (req, res) => {
 
       .input("LISTOFUNQID", sql.VarChar, srlUnq)
 
-      .execute("SP_FOR_SRL");
+      .execute("A_SP_FOR_SRL_APP");
 
 
     // ===============================
@@ -307,7 +307,7 @@ console.log("userId =", userId);
         srlUnq
       )
 
-      .execute("SP_FOR_SRL");
+      .execute("A_SP_FOR_SRL_APP");
 
     res.json({
       success: true,
@@ -359,7 +359,7 @@ app.post("/api/challan-approval", async (req, res) => {
         challanUnq
       )
 
-      .execute("SP_FOR_SRL");
+      .execute("A_SP_FOR_SRL_APP");
 
     res.json({
       success: true,
@@ -486,6 +486,32 @@ VALUES
   }
 });
 
+app.post("/api/get-count", async (req, res) => {
+  try {
+
+    const { databaseName } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input("what", sql.VarChar, "GET_COUNT")
+      .execute("A_SP_FOR_SRL_APP");
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
 
 // ─────────────────────────────────────────────────────
 // START SERVER
