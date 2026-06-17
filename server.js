@@ -209,11 +209,13 @@ app.post("/api/srl-approval", async (req, res) => {
     // SEND NOTIFICATION HERE
     // ===============================
 
-    const cmpyPool =
-      await getPool();
+   // ===============================
+// SEND NOTIFICATION HERE
+// ===============================
 
+const cmpyPool = await getPool();
 
-      const srlResult = await pool.request()
+const srlResult = await pool.request()
   .input("srlUnq", sql.VarChar, srlUnq)
   .query(`
       SELECT 
@@ -225,38 +227,110 @@ app.post("/api/srl-approval", async (req, res) => {
       WHERE sm1016_c.UNQID = @srlUnq
   `);
 
-const targetUserId = srlResult.recordset[0]?.USERID;
+const targetUserId =
+  srlResult.recordset[0]?.USERID;
 
 const orderNo =
   srlResult.recordset[0]?.ORDERNO;
 
-console.log("Target User ID:", targetUserId);
-console.log("Sending notification to User:", targetUserId);
-    const tokenResult =
-      await cmpyPool.request()
- .input("userId", sql.VarChar, targetUserId)
-      .query(`
-        SELECT DEVICETOKEN
-        FROM APP_DEVICE_TOKEN
-        WHERE USERID=@userId
-      `);
+const message =
+  `Your order no. ${orderNo} has been approved.`;
 
-    if (
-      tokenResult.recordset.length > 0
-    ) {
+console.log(
+  "Target User ID:",
+  targetUserId
+);
 
-      const token =
-        tokenResult.recordset[0]
-          .DEVICETOKEN;
+console.log(
+  "Order No:",
+  orderNo
+);
 
-      await sendNotification(
+// =====================================
+// SAVE NOTIFICATION IN DATABASE
+// =====================================
 
-        token,
+if (targetUserId) {
 
-        "SRL Approved",
-        `Your order no. ${orderNo} has been approved.`
-      );
-    }
+  await cmpyPool.request()
+
+    .input(
+      "USERID",
+      sql.VarChar,
+      targetUserId
+    )
+
+    .input(
+      "TITLE",
+      sql.VarChar,
+      "SRL Approved"
+    )
+
+    .input(
+      "MESSAGE",
+      sql.NVarChar,
+      message
+    )
+
+    .input(
+      "REFERENCEID",
+      sql.VarChar,
+      srlUnq
+    )
+
+    .query(`
+      INSERT INTO APP_NOTIFICATION
+      (
+        USERID,
+        TITLE,
+        MESSAGE,
+        REFERENCEID
+      )
+      VALUES
+      (
+        @USERID,
+        @TITLE,
+        @MESSAGE,
+        @REFERENCEID
+      )
+    `);
+}
+
+// =====================================
+// SEND PUSH NOTIFICATION (FCM)
+// =====================================
+
+const tokenResult =
+  await cmpyPool.request()
+
+    .input(
+      "userId",
+      sql.VarChar,
+      targetUserId
+    )
+
+    .query(`
+      SELECT DEVICETOKEN
+      FROM APP_DEVICE_TOKEN
+      WHERE USERID = @userId
+    `);
+
+if (
+  tokenResult.recordset.length > 0
+) {
+
+  const token =
+    tokenResult.recordset[0]
+      .DEVICETOKEN;
+
+  await sendNotification(
+    token,
+    "SRL Approved",
+    message
+  );
+}
+
+// ===============================
 
     // ===============================
 
@@ -517,6 +591,68 @@ app.post("/api/get-count", async (req, res) => {
       message: err.message
     });
   }
+});
+
+app.post("/api/notifications", async (req, res) => {
+
+  try {
+
+    const { userId } = req.body;
+
+    const pool = await getPool();
+
+    const result = await pool.request()
+
+      .input(
+        "userId",
+        sql.VarChar,
+        userId
+      )
+
+      .query(`
+        SELECT *
+        FROM APP_NOTIFICATION
+        WHERE USERID = @userId
+        ORDER BY CREATEDON DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
+app.post("/api/read-notification", async (req, res) => {
+
+  const { id } = req.body;
+
+  const pool = await getPool();
+
+  await pool.request()
+
+    .input(
+      "id",
+      sql.Int,
+      id
+    )
+
+    .query(`
+      UPDATE APP_NOTIFICATION
+      SET ISREAD = 1
+      WHERE ID = @id
+    `);
+
+  res.json({
+    success: true
+  });
 });
 
 // ─────────────────────────────────────────────────────
