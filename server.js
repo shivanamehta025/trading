@@ -213,7 +213,7 @@ app.post("/api/srl-approval", async (req, res) => {
 // SEND NOTIFICATION HERE
 // ===============================
 
-const cmpyPool = await getPool();
+const cmpyPool = await getPool(databaseName);
 
 const srlResult = await pool.request()
   .input("srlUnq", sql.VarChar, srlUnq)
@@ -610,7 +610,12 @@ app.post("/api/notifications", async (req, res) => {
       )
 
       .query(`
-        SELECT *
+        SELECT
+          ID,
+          TITLE,
+          MESSAGE,
+          ISREAD,
+          CREATEDON
         FROM APP_NOTIFICATION
         WHERE USERID = @userId
         ORDER BY CREATEDON DESC
@@ -652,6 +657,34 @@ app.post("/api/read-notification", async (req, res) => {
 
   res.json({
     success: true
+  });
+});
+
+app.post("/api/unread-count", async (req, res) => {
+
+  const { userId } = req.body;
+
+  const pool = await getPool();
+
+  const result =
+      await pool.request()
+
+      .input(
+        "userId",
+        sql.VarChar,
+        userId
+      )
+
+      .query(`
+        SELECT COUNT(*) AS COUNT
+        FROM APP_NOTIFICATION
+        WHERE USERID=@userId
+        AND ISREAD=0
+      `);
+
+  res.json({
+    count:
+        result.recordset[0].COUNT
   });
 });
 
