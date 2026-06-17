@@ -216,12 +216,19 @@ app.post("/api/srl-approval", async (req, res) => {
       const srlResult = await pool.request()
   .input("srlUnq", sql.VarChar, srlUnq)
   .query(`
-      SELECT sm1016_c3 AS USERID
+      SELECT 
+          sm1016_c3 AS USERID,
+          sm1016_5 AS ORDERNO
       FROM sm1016_c
-      WHERE unqid = @srlUnq
+      INNER JOIN SM1016
+          ON SM1016.UNQID = SM1016_C.SM1016_C5
+      WHERE sm1016_c.UNQID = @srlUnq
   `);
 
 const targetUserId = srlResult.recordset[0]?.USERID;
+
+const orderNo =
+  srlResult.recordset[0]?.ORDERNO;
 
 console.log("Target User ID:", targetUserId);
 console.log("Sending notification to User:", targetUserId);
@@ -247,8 +254,7 @@ console.log("Sending notification to User:", targetUserId);
         token,
 
         "SRL Approved",
-
-        "Your SRL has been approved."
+        `Your order no. ${orderNo} has been approved.`
       );
     }
 
