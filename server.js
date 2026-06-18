@@ -204,11 +204,6 @@ app.post("/api/srl-approval", async (req, res) => {
 
       .execute("A_SP_FOR_SRL_APP");
 
-
-    // ===============================
-    // SEND NOTIFICATION HERE
-    // ===============================
-
    // ===============================
 // SEND NOTIFICATION HERE
 // ===============================
@@ -252,7 +247,7 @@ console.log(
 
 if (targetUserId) {
 
-  await cmpyPool.request()
+   await pool.request()
 
     .input(
       "USERID",
@@ -304,9 +299,11 @@ if (targetUserId) {
 // SEND PUSH NOTIFICATION (FCM)
 // =====================================
 
-const tokenResult =
-  await tokenPool.request()
+ const cmpyPool =
+      await getPool();
 
+    const tokenResult =
+      await cmpyPool.request()
     .input(
       "userId",
       sql.VarChar,
