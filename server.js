@@ -305,7 +305,7 @@ if (targetUserId) {
 // =====================================
 
 const tokenResult =
-  await cmpyPool.request()
+  await tokenPool.request()
 
     .input(
       "userId",
