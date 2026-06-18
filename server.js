@@ -208,8 +208,6 @@ app.post("/api/srl-approval", async (req, res) => {
 // SEND NOTIFICATION HERE
 // ===============================
 
-const cmpyPool = await getPool(databaseName);
-
 const srlResult = await pool.request()
   .input("srlUnq", sql.VarChar, srlUnq)
   .query(`
@@ -687,7 +685,11 @@ app.post("/api/read-notification", async (req, res) => {
 
     await pool.request()
 
-      .input("id", sql.Int, id)
+      .input(
+        "id",
+        sql.Int,
+        id
+      )
 
       .query(`
         UPDATE APP_NOTIFICATION
@@ -701,13 +703,14 @@ app.post("/api/read-notification", async (req, res) => {
 
   } catch (err) {
 
+    console.log(err);
+
     res.status(500).json({
       success: false,
       message: err.message
     });
   }
 });
-
 app.post("/api/unread-count", async (req, res) => {
 
   const { userId } = req.body;
