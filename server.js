@@ -599,7 +599,7 @@ app.post("/api/notifications", async (req, res) => {
 
     const { userId } = req.body;
 
-    const pool = await getPool();
+    const pool = await getPool(databaseName);
 
     const result = await pool.request()
 
@@ -639,7 +639,7 @@ app.post("/api/read-notification", async (req, res) => {
 
   const { id } = req.body;
 
-  const pool = await getPool();
+  const pool = await getPool(databaseName);
 
   await pool.request()
 
@@ -664,7 +664,7 @@ app.post("/api/unread-count", async (req, res) => {
 
   const { userId } = req.body;
 
-  const pool = await getPool();
+  const pool = await getPool(databaseName);
 
   const result =
       await pool.request()
