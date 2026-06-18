@@ -616,7 +616,7 @@ app.post("/api/notifications", async (req, res) => {
 
       if (db.trim() === "NT") {
         databaseName =
-          "Accounting_Trading_NT";
+          "ac25";
       }
 
       if (!databaseName) continue;
@@ -711,34 +711,58 @@ app.post("/api/read-notification", async (req, res) => {
     });
   }
 });
-app.post("/api/unread-count", async (req, res) => {
+app.post("/api/notification-count", async (req, res) => {
 
-  const { userId } = req.body;
+  try {
 
-  const pool = await getPool(databaseName);
+    const {
+      userId,
+      allowedDatabases
+    } = req.body;
 
-  const result =
-      await pool.request()
+    let totalCount = 0;
 
-      .input(
-        "userId",
-        sql.VarChar,
-        userId
-      )
+    const databases =
+      allowedDatabases.split(",");
 
-      .query(`
-        SELECT COUNT(*) AS COUNT
-        FROM APP_NOTIFICATION
-        WHERE USERID=@userId
-        AND ISREAD=0
-      `);
+    for (const db of databases) {
 
-  res.json({
-    count:
-        result.recordset[0].COUNT
-  });
+      const pool =
+        await getPool(db.trim());
+
+      const result =
+        await pool.request()
+
+          .input(
+            "userId",
+            sql.VarChar,
+            userId
+          )
+
+          .query(`
+            SELECT COUNT(*) AS CNT
+            FROM APP_NOTIFICATION
+            WHERE USERID=@userId
+            AND ISREAD=0
+          `);
+
+      totalCount +=
+        result.recordset[0].CNT;
+    }
+
+    res.json({
+      success: true,
+      count: totalCount
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
 });
-
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
