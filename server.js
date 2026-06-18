@@ -602,6 +602,9 @@ app.post("/api/notifications", async (req, res) => {
       databaseName
     } = req.body;
 
+    console.log("USERID:", userId);
+console.log("DATABASE:", databaseName);
+
     const pool =
       await getPool(databaseName);
 
