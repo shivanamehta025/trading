@@ -599,44 +599,70 @@ app.post("/api/notifications", async (req, res) => {
 
     const {
       userId,
-      databaseName
+      allowedDatabases
     } = req.body;
 
-    console.log("USERID:", userId);
-console.log("DATABASE:", databaseName);
+    let allNotifications = [];
 
-    const pool =
-      await getPool(databaseName);
+    const dbs =
+      allowedDatabases.split(",");
 
-    const result =
-      await pool.request()
+    for (const db of dbs) {
 
-        .input(
-          "userId",
-          sql.VarChar,
-          userId
-        )
+      let databaseName = "";
 
-        .query(`
-          SELECT
-            ID,
-            TITLE,
-            MESSAGE,
-            ISREAD,
-            CREATEDON
-          FROM APP_NOTIFICATION
-          WHERE USERID = @userId
-          ORDER BY CREATEDON DESC
-        `);
+      if (db.trim() === "TRADING") {
+        databaseName = "Testing";
+      }
+
+      if (db.trim() === "NT") {
+        databaseName =
+          "Accounting_Trading_NT";
+      }
+
+      if (!databaseName) continue;
+
+      const pool =
+        await getPool(databaseName);
+
+      const result =
+        await pool.request()
+
+          .input(
+            "userId",
+            sql.VarChar,
+            userId
+          )
+
+          .query(`
+            SELECT
+              ID,
+              TITLE,
+              MESSAGE,
+              CREATEDON,
+              '${db}' AS COMPANY
+            FROM APP_NOTIFICATION
+            WHERE USERID=@userId
+          `);
+
+      allNotifications.push(
+        ...result.recordset
+      );
+    }
+
+    allNotifications.sort(
+      (a, b) =>
+        new Date(b.CREATEDON) -
+        new Date(a.CREATEDON)
+    );
 
     res.json({
       success: true,
-      data: result.recordset
+      data: allNotifications
     });
 
   } catch (err) {
 
-    console.log("NOTIFICATION ERROR:");
     console.log(err);
 
     res.status(500).json({
