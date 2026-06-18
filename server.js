@@ -715,53 +715,47 @@ app.post("/api/notification-count", async (req, res) => {
 
   try {
 
-    const {
-      userId,
-      allowedDatabases
-    } = req.body;
+   const dbMap = {
+  TRADING: "Testing",
+  NT: "Accounting_Trading_NT"
+};
 
-    let totalCount = 0;
+const databases = allowedDatabases.split(",");
 
-    const databases =
-      allowedDatabases.split(",");
+for (const db of databases) {
 
-    for (const db of databases) {
+  const actualDb =
+      dbMap[db.trim().toUpperCase()];
 
-      const pool =
-        await getPool(db.trim());
+  if (!actualDb) continue;
 
-      const result =
-        await pool.request()
+  const pool =
+      await getPool(actualDb);
 
-          .input(
-            "userId",
-            sql.VarChar,
-            userId
-          )
+  const result =
+      await pool.request()
+      .input("userId", sql.VarChar, userId)
+      .query(`
+        SELECT COUNT(*) AS CNT
+        FROM APP_NOTIFICATION
+        WHERE USERID=@userId
+        AND ISREAD=0
+      `);
 
-          .query(`
-            SELECT COUNT(*) AS CNT
-            FROM APP_NOTIFICATION
-            WHERE USERID=@userId
-            AND ISREAD=0
-          `);
-
-      totalCount +=
-        result.recordset[0].CNT;
-    }
-
-    res.json({
-      success: true,
-      count: totalCount
-    });
+  totalCount +=
+      result.recordset[0].CNT;
+}
 
   } catch (err) {
 
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
-  }
+  console.log("NOTIFICATION COUNT ERROR");
+  console.log(err);
+
+  res.status(500).json({
+    success: false,
+    message: err.message
+  });
+}
 });
 // ─────────────────────────────────────────────────────
 // START SERVER
