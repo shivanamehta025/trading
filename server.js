@@ -299,11 +299,11 @@ if (targetUserId) {
 // SEND PUSH NOTIFICATION (FCM)
 // =====================================
 
- const cmpyPool =
+ const companyPool =
       await getPool();
 
     const tokenResult =
-      await cmpyPool.request()
+      await companyPool.request()
     .input(
       "userId",
       sql.VarChar,
