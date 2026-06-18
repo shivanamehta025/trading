@@ -597,29 +597,34 @@ app.post("/api/notifications", async (req, res) => {
 
   try {
 
-    const { userId } = req.body;
+    const {
+      userId,
+      databaseName
+    } = req.body;
 
-    const pool = await getPool(databaseName);
+    const pool =
+      await getPool(databaseName);
 
-    const result = await pool.request()
+    const result =
+      await pool.request()
 
-      .input(
-        "userId",
-        sql.VarChar,
-        userId
-      )
+        .input(
+          "userId",
+          sql.VarChar,
+          userId
+        )
 
-      .query(`
-        SELECT
-          ID,
-          TITLE,
-          MESSAGE,
-          ISREAD,
-          CREATEDON
-        FROM APP_NOTIFICATION
-        WHERE USERID = @userId
-        ORDER BY CREATEDON DESC
-      `);
+        .query(`
+          SELECT
+            ID,
+            TITLE,
+            MESSAGE,
+            ISREAD,
+            CREATEDON
+          FROM APP_NOTIFICATION
+          WHERE USERID = @userId
+          ORDER BY CREATEDON DESC
+        `);
 
     res.json({
       success: true,
@@ -627,6 +632,9 @@ app.post("/api/notifications", async (req, res) => {
     });
 
   } catch (err) {
+
+    console.log("NOTIFICATION ERROR:");
+    console.log(err);
 
     res.status(500).json({
       success: false,
