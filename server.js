@@ -278,20 +278,24 @@ if (targetUserId) {
       srlUnq
     )
 
+    .input("DATABASENAME", sql.VarChar, databaseName)
+
     .query(`
       INSERT INTO APP_NOTIFICATION
       (
         USERID,
         TITLE,
         MESSAGE,
-        REFERENCEID
+        REFERENCEID,
+        DATABASENAME
       )
       VALUES
       (
         @USERID,
         @TITLE,
         @MESSAGE,
-        @REFERENCEID
+        @REFERENCEID,
+        @DATABASENAME
       )
     `);
 }
@@ -640,7 +644,7 @@ app.post("/api/notifications", async (req, res) => {
               TITLE,
               MESSAGE,
               CREATEDON,
-              '${db}' AS COMPANY
+             DATABASENAME
             FROM APP_NOTIFICATION
             WHERE USERID=@userId
           `);
@@ -674,27 +678,37 @@ app.post("/api/notifications", async (req, res) => {
 
 app.post("/api/read-notification", async (req, res) => {
 
-  const { id } = req.body;
+  try {
 
-  const pool = await getPool(databaseName);
+    const {
+      id,
+      databaseName
+    } = req.body;
 
-  await pool.request()
+    const pool =
+      await getPool(databaseName);
 
-    .input(
-      "id",
-      sql.Int,
-      id
-    )
+    await pool.request()
 
-    .query(`
-      UPDATE APP_NOTIFICATION
-      SET ISREAD = 1
-      WHERE ID = @id
-    `);
+      .input("id", sql.Int, id)
 
-  res.json({
-    success: true
-  });
+      .query(`
+        UPDATE APP_NOTIFICATION
+        SET ISREAD = 1
+        WHERE ID = @id
+      `);
+
+    res.json({
+      success: true
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
 });
 
 app.post("/api/unread-count", async (req, res) => {
