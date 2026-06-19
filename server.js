@@ -638,7 +638,7 @@ app.post("/api/notifications", async (req, res) => {
               ID,
               TITLE,
               MESSAGE,
-              ISNULL(ISREAD,0) AS ISREAD,
+              CAST(ISNULL(ISREAD,0) AS INT) AS ISREAD,
               CREATEDON,
              DATABASENAME
             FROM APP_NOTIFICATION
