@@ -717,7 +717,7 @@ app.post("/api/notification-count", async (req, res) => {
 
    const dbMap = {
   TRADING: "Testing",
-  NT: "Accounting_Trading_NT"
+  NT: "ac25"
 };
 
 const databases = allowedDatabases.split(",");
