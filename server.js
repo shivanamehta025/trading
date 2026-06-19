@@ -711,51 +711,76 @@ app.post("/api/read-notification", async (req, res) => {
     });
   }
 });
+
 app.post("/api/notification-count", async (req, res) => {
 
   try {
 
-   const dbMap = {
-  TRADING: "Testing",
-  NT: "ac25"
-};
+    const {
+      userId,
+      allowedDatabases
+    } = req.body;
 
-const databases = allowedDatabases.split(",");
+    let totalCount = 0;
 
-for (const db of databases) {
+    const dbMap = {
+      TRADING: "Testing",
+      NT: "ac25"
+    };
 
-  const actualDb =
-      dbMap[db.trim().toUpperCase()];
+    const databases =
+      allowedDatabases.split(",");
 
-  if (!actualDb) continue;
+    for (const db of databases) {
 
-  const pool =
-      await getPool(actualDb);
+      const actualDb =
+        dbMap[db.trim().toUpperCase()];
 
-  const result =
-      await pool.request()
-      .input("userId", sql.VarChar, userId)
-      .query(`
-        SELECT COUNT(*) AS CNT
-        FROM APP_NOTIFICATION
-        WHERE USERID=@userId
-        AND ISREAD=0
-      `);
+      if (!actualDb) {
+        continue;
+      }
 
-  totalCount +=
-      result.recordset[0].CNT;
-}
+      const pool =
+        await getPool(actualDb);
+
+      const result =
+        await pool.request()
+
+          .input(
+            "userId",
+            sql.VarChar,
+            userId
+          )
+
+          .query(`
+            SELECT COUNT(*) AS CNT
+            FROM APP_NOTIFICATION
+            WHERE USERID = @userId
+              AND ISREAD = 0
+          `);
+
+      totalCount +=
+        result.recordset[0].CNT;
+    }
+
+    res.json({
+      success: true,
+      count: totalCount
+    });
 
   } catch (err) {
 
-  console.log("NOTIFICATION COUNT ERROR");
-  console.log(err);
+    console.log(
+      "NOTIFICATION COUNT ERROR"
+    );
 
-  res.status(500).json({
-    success: false,
-    message: err.message
-  });
-}
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
 });
 // ─────────────────────────────────────────────────────
 // START SERVER
