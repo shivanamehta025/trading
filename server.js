@@ -1147,6 +1147,143 @@ app.post("/api/get-chat", async (req, res) => {
     });
   }
 });
+
+
+app.post("/api/create-srl-notification", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName,
+      referenceId,
+      orderNo,
+      targetUser
+    } = req.body;
+
+    const pool =
+      await getPool(databaseName);
+
+    const companyPool =
+      await getPool();
+
+    const message =
+      `Order No. ${orderNo} requires approval.`;
+
+    // ==========================
+    // SAVE NOTIFICATION
+    // ==========================
+
+    await pool.request()
+
+      .input(
+        "USERID",
+        sql.VarChar,
+        targetUser
+      )
+
+      .input(
+        "TITLE",
+        sql.VarChar,
+        "New SRL"
+      )
+
+      .input(
+        "MESSAGE",
+        sql.NVarChar,
+        message
+      )
+
+      .input(
+        "REFERENCEID",
+        sql.VarChar,
+        referenceId
+      )
+
+      .input(
+        "DATABASENAME",
+        sql.VarChar,
+        databaseName
+      )
+
+      .query(`
+        INSERT INTO APP_NOTIFICATION
+        (
+          USERID,
+          TITLE,
+          MESSAGE,
+          REFERENCEID,
+          DATABASENAME,
+          ISREAD,
+          CREATEDON
+        )
+        VALUES
+        (
+          @USERID,
+          @TITLE,
+          @MESSAGE,
+          @REFERENCEID,
+          @DATABASENAME,
+          0,
+          GETDATE()
+        )
+      `);
+
+    // ==========================
+    // GET DEVICE TOKEN
+    // ==========================
+
+    const tokenResult =
+      await companyPool.request()
+
+      .input(
+        "userId",
+        sql.VarChar,
+        targetUser
+      )
+
+      .query(`
+        SELECT DEVICETOKEN
+        FROM APP_DEVICE_TOKEN
+        WHERE USERID='ADM'
+      `);
+
+    // ==========================
+    // SEND FCM
+    // ==========================
+
+    if (
+      tokenResult.recordset.length > 0
+    ) {
+
+      const token =
+        tokenResult.recordset[0]
+          .DEVICETOKEN;
+
+      await sendNotification(
+
+        token,
+
+        "New SRL",
+
+        message
+      );
+    }
+
+    res.json({
+      success: true
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
