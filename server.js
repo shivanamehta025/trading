@@ -884,13 +884,15 @@ app.post("/api/notifications", async (req, res) => {
 
           .query(`
             SELECT
-              ID,
-              TITLE,
-              MESSAGE,
-              CAST(ISNULL(ISREAD,0) AS INT) AS ISREAD,
-              CREATEDON,
-             DATABASENAME
-            FROM APP_NOTIFICATION
+ ID,
+ USERID,
+ TITLE,
+ MESSAGE,
+ ISREAD,
+ CREATEDON,
+ REFERENCEID,
+ DATABASENAME
+FROM APP_NOTIFICATION
             WHERE USERID=@userId
           `);
 
