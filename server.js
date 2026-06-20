@@ -1150,7 +1150,8 @@ app.post("/api/get-chat", async (req, res) => {
 
 
 app.post("/api/create-srl-notification", async (req, res) => {
-
+  console.log("BODY RECEIVED");
+  console.log(req.body);
   try {
 
     const {
@@ -1275,12 +1276,13 @@ app.post("/api/create-srl-notification", async (req, res) => {
 
   } catch (err) {
 
-    console.log(err);
+    console.log("CREATE NOTIFICATION ERROR");
+     console.log(err);
 
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
+     res.status(500).json({
+        success:false,
+        message:err.message
+     });
   }
 });
 
