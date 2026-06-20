@@ -561,6 +561,133 @@ app.post("/api/challan-approval", async (req, res) => {
       )
 
       .execute("A_SP_FOR_SRL_APP");
+	  
+	  // ===============================
+// SEND NOTIFICATION HERE
+// ===============================
+
+const srlResult = await pool.request()
+  .input("challanUnq", sql.VarChar, challanUnq)
+  .query(`
+      SELECT 
+          sm1008_3 AS USERID,
+          sm1008_15 AS ChallanNO
+      FROM sm1008
+      WHERE sm1008.UNQID  = @challanUnq
+  `);
+
+const targetUserId =
+  srlResult.recordset[0]?.USERID;
+
+const ChallanNO =
+  srlResult.recordset[0]?.ChallanNO;
+
+const message =
+  `Your Challan No. ${ChallanNO} has been approved.`;
+
+console.log(
+  "Target User ID:",
+  targetUserId
+);
+
+console.log(
+  "Order No:",
+  ChallanNO
+);
+
+// =====================================
+// SAVE NOTIFICATION IN DATABASE
+// =====================================
+
+if (targetUserId) {
+
+   await pool.request()
+
+    .input(
+      "USERID",
+      sql.VarChar,
+      targetUserId
+    )
+
+    .input(
+      "TITLE",
+      sql.VarChar,
+      "Challan Approved"
+    )
+
+    .input(
+      "MESSAGE",
+      sql.NVarChar,
+      message
+    )
+
+    .input(
+      "REFERENCEID",
+      sql.VarChar,
+      challanUnq
+    )
+
+    .input("DATABASENAME", sql.VarChar, databaseName)
+
+    .query(`
+      INSERT INTO APP_NOTIFICATION
+      (
+        USERID,
+        TITLE,
+        MESSAGE,
+        REFERENCEID,
+        DATABASENAME
+      )
+      VALUES
+      (
+        @USERID,
+        @TITLE,
+        @MESSAGE,
+        @REFERENCEID,
+        @DATABASENAME
+      )
+    `);
+}
+
+// =====================================
+// SEND PUSH NOTIFICATION (FCM)
+// =====================================
+
+ const companyPool =
+      await getPool();
+
+    const tokenResult =
+      await companyPool.request()
+    .input(
+      "userId",
+      sql.VarChar,
+      targetUserId
+    )
+
+    .query(`
+      SELECT DEVICETOKEN
+      FROM APP_DEVICE_TOKEN
+      WHERE USERID = @userId
+    `);
+
+if (
+  tokenResult.recordset.length > 0
+) {
+
+  const token =
+    tokenResult.recordset[0]
+      .DEVICETOKEN;
+
+  await sendNotification(
+    token,
+    "Challan Approved",
+    message
+  );
+}
+
+// ===============================
+
+    // ===============================
 
     res.json({
       success: true,
