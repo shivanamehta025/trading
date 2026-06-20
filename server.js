@@ -1034,6 +1034,119 @@ app.post("/api/notification-count", async (req, res) => {
     });
   }
 });
+
+app.post("/api/send-chat", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName,
+      referenceId,
+      fromUser,
+      toUser,
+      message
+    } = req.body;
+
+    const pool =
+      await getPool(databaseName);
+
+    await pool.request()
+
+      .input(
+        "REFERENCEID",
+        sql.VarChar,
+        referenceId
+      )
+
+      .input(
+        "FROMUSER",
+        sql.VarChar,
+        fromUser
+      )
+
+      .input(
+        "TOUSER",
+        sql.VarChar,
+        toUser
+      )
+
+      .input(
+        "MESSAGE",
+        sql.NVarChar,
+        message
+      )
+
+      .query(`
+        INSERT INTO APP_CHAT
+        (
+          REFERENCEID,
+          FROMUSER,
+          TOUSER,
+          MESSAGE
+        )
+        VALUES
+        (
+          @REFERENCEID,
+          @FROMUSER,
+          @TOUSER,
+          @MESSAGE
+        )
+      `);
+
+    res.json({
+      success: true
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
+app.post("/api/get-chat", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName,
+      referenceId
+    } = req.body;
+
+    const pool =
+      await getPool(databaseName);
+
+    const result =
+      await pool.request()
+
+      .input(
+        "REFERENCEID",
+        sql.VarChar,
+        referenceId
+      )
+
+      .query(`
+        SELECT *
+        FROM APP_CHAT
+        WHERE REFERENCEID=@REFERENCEID
+        ORDER BY CREATEDON
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
