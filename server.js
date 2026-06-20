@@ -362,32 +362,154 @@ app.post("/api/srl-reject", async (req, res) => {
 
     const pool =
       await getPool(databaseName);
-console.log("userId =", userId);
+
     const result =
       await pool.request()
 
-      .input(
-        "what",
-        sql.VarChar,
-        "SRLreject"
-      )
+.input("what",sql.VarChar,"SRLreject")
 
-      .input(
-        "SM1016_28",
-        sql.VarChar,
-        userId
-      )
+      
+	  
+	  
+	  
+	  .input("SM1016_28",sql.VarChar,userId)
 
      
 
-      .input(
-        "LISTOFUNQID",
-        sql.VarChar,
-        srlUnq
+								   
+
+		.input("LISTOFUNQID",sql.VarChar,srlUnq)
+			
+.execute("A_SP_FOR_SRL_APP");
+							   
+		 // ===============================
+// SEND NOTIFICATION HERE
+// ===============================
+
+const srlResult = await pool.request()
+  .input("srlUnq", sql.VarChar, srlUnq)
+  .query(`
+      SELECT 
+          sm1016_c3 AS USERID,
+          sm1016_5 AS ORDERNO
+      FROM sm1016_c
+      INNER JOIN SM1016
+          ON SM1016.UNQID = SM1016_C.SM1016_C5
+      WHERE sm1016_c.UNQID = @srlUnq
+  `);
+
+const targetUserId =
+  srlResult.recordset[0]?.USERID;
+
+const orderNo =
+  srlResult.recordset[0]?.ORDERNO;
+
+const message =
+  `Your order no. ${orderNo} has been Rejected.`;
+
+console.log(
+  "Target User ID:",
+  targetUserId
+);
+
+console.log(
+  "Order No:",
+  orderNo
+);
+
+// =====================================
+// SAVE NOTIFICATION IN DATABASE
+// =====================================
+
+if (targetUserId) {
+
+   await pool.request()
+
+    .input(
+      "USERID",
+      sql.VarChar,
+      targetUserId
+    )
+
+    .input(
+      "TITLE",
+      sql.VarChar,
+      "SRL Rejected"
+    )
+
+    .input(
+      "MESSAGE",
+      sql.NVarChar,
+      message
+    )
+
+    .input(
+      "REFERENCEID",
+      sql.VarChar,
+      srlUnq
+    )
+
+    .input("DATABASENAME", sql.VarChar, databaseName)
+
+    .query(`
+      INSERT INTO APP_NOTIFICATION
+      (
+        USERID,
+        TITLE,
+        MESSAGE,
+        REFERENCEID,
+        DATABASENAME
       )
+      VALUES
+      (
+        @USERID,
+        @TITLE,
+        @MESSAGE,
+        @REFERENCEID,
+        @DATABASENAME
+      )
+    `);
+}
 
-      .execute("A_SP_FOR_SRL_APP");
+// =====================================
+// SEND PUSH NOTIFICATION (FCM)
+// =====================================
 
+ const companyPool =
+      await getPool();
+
+    const tokenResult =
+      await companyPool.request()
+    .input(
+      "userId",
+      sql.VarChar,
+      targetUserId
+    )
+
+    .query(`
+      SELECT DEVICETOKEN
+      FROM APP_DEVICE_TOKEN
+      WHERE USERID = @userId
+    `);
+
+if (
+  tokenResult.recordset.length > 0
+) {
+
+  const token =
+    tokenResult.recordset[0]
+      .DEVICETOKEN;
+
+  await sendNotification(
+    token,
+    "SRL Rejected",
+    message
+  );
+}
+
+// ===============================
+
+    // ===============================								
     res.json({
       success: true,
       data: result.recordset
