@@ -539,6 +539,13 @@ app.post("/api/challan-approval", async (req, res) => {
     const pool =
       await getPool(databaseName);
 
+    const companyPool =
+      await getPool();
+
+    // =====================================
+    // CHALLAN APPROVAL
+    // =====================================
+
     const result =
       await pool.request()
 
@@ -561,133 +568,294 @@ app.post("/api/challan-approval", async (req, res) => {
       )
 
       .execute("A_SP_FOR_SRL_APP");
-	  
-	  // ===============================
-// SEND NOTIFICATION HERE
-// ===============================
 
-const srlResult = await pool.request()
-  .input("challanUnq", sql.VarChar, challanUnq)
-  .query(`
-      SELECT 
-          sm1008_3 AS USERID,
-          sm1008_15 AS ChallanNO
-      FROM sm1008
-      WHERE sm1008.UNQID  = @challanUnq
-  `);
+    // =====================================
+    // NOTIFY CHALLAN CREATOR
+    // =====================================
 
-const targetUserId =
-  srlResult.recordset[0]?.USERID;
+    const challanResult =
+      await pool.request()
 
-const ChallanNO =
-  srlResult.recordset[0]?.ChallanNO;
-
-const message =
-  `Your Challan No. ${ChallanNO} has been approved.`;
-
-console.log(
-  "Target User ID:",
-  targetUserId
-);
-
-console.log(
-  "Order No:",
-  ChallanNO
-);
-
-// =====================================
-// SAVE NOTIFICATION IN DATABASE
-// =====================================
-
-if (targetUserId) {
-
-   await pool.request()
-
-    .input(
-      "USERID",
-      sql.VarChar,
-      targetUserId
-    )
-
-    .input(
-      "TITLE",
-      sql.VarChar,
-      "Challan Approved"
-    )
-
-    .input(
-      "MESSAGE",
-      sql.NVarChar,
-      message
-    )
-
-    .input(
-      "REFERENCEID",
-      sql.VarChar,
-      challanUnq
-    )
-
-    .input("DATABASENAME", sql.VarChar, databaseName)
-
-    .query(`
-      INSERT INTO APP_NOTIFICATION
-      (
-        USERID,
-        TITLE,
-        MESSAGE,
-        REFERENCEID,
-        DATABASENAME
+      .input(
+        "challanUnq",
+        sql.VarChar,
+        challanUnq
       )
-      VALUES
-      (
-        @USERID,
-        @TITLE,
-        @MESSAGE,
-        @REFERENCEID,
-        @DATABASENAME
+
+      .query(`
+        SELECT
+            sm1008_3 AS USERID,
+            sm1008_15 AS ChallanNO
+        FROM sm1008
+        WHERE UNQID = @challanUnq
+      `);
+
+    const targetUserId =
+      challanResult.recordset[0]?.USERID;
+
+    const challanNo =
+      challanResult.recordset[0]?.ChallanNO;
+
+    const approvalMessage =
+      `Your Challan No. ${challanNo} has been approved.`;
+
+    if (targetUserId) {
+
+      await pool.request()
+
+        .input(
+          "USERID",
+          sql.VarChar,
+          targetUserId
+        )
+
+        .input(
+          "TITLE",
+          sql.VarChar,
+          "Challan Approved"
+        )
+
+        .input(
+          "MESSAGE",
+          sql.NVarChar,
+          approvalMessage
+        )
+
+        .input(
+          "REFERENCEID",
+          sql.VarChar,
+          challanUnq
+        )
+
+        .input(
+          "DATABASENAME",
+          sql.VarChar,
+          databaseName
+        )
+
+        .query(`
+          INSERT INTO APP_NOTIFICATION
+          (
+            USERID,
+            TITLE,
+            MESSAGE,
+            REFERENCEID,
+            DATABASENAME
+          )
+          VALUES
+          (
+            @USERID,
+            @TITLE,
+            @MESSAGE,
+            @REFERENCEID,
+            @DATABASENAME
+          )
+        `);
+
+      const tokenResult =
+        await companyPool.request()
+
+        .input(
+          "userId",
+          sql.VarChar,
+          targetUserId
+        )
+
+        .query(`
+          SELECT DEVICETOKEN
+          FROM APP_DEVICE_TOKEN
+          WHERE USERID=@userId
+        `);
+
+      if (tokenResult.recordset.length > 0) {
+
+        await sendNotification(
+          tokenResult.recordset[0].DEVICETOKEN,
+          "Challan Approved",
+          approvalMessage
+        );
+      }
+    }
+
+    // =====================================
+    // CHALLAN LOSS / PRICE DROP ALERT
+    // =====================================
+
+    const lossData =
+      await pool.request()
+
+      .input(
+        "what",
+        sql.VarChar,
+        "challanA"
       )
-    `);
-}
 
-// =====================================
-// SEND PUSH NOTIFICATION (FCM)
-// =====================================
+      .input(
+        "LISTOFUNQID",
+        sql.VarChar,
+        challanUnq
+      )
 
- const companyPool =
-      await getPool();
+      .execute("SP_FOR_SRL_APP");
 
-    const tokenResult =
-      await companyPool.request()
-    .input(
-      "userId",
-      sql.VarChar,
-      targetUserId
-    )
+    const userTable =
+      lossData.recordsets[2];
 
-    .query(`
-      SELECT DEVICETOKEN
-      FROM APP_DEVICE_TOKEN
-      WHERE USERID = @userId
-    `);
+    const dataTable =
+      lossData.recordsets[3];
 
-if (
-  tokenResult.recordset.length > 0
-) {
+    if (
+      userTable &&
+      userTable.length > 0 &&
+      dataTable &&
+      dataTable.length > 0
+    ) {
 
-  const token =
-    tokenResult.recordset[0]
-      .DEVICETOKEN;
+      const row =
+        dataTable[0];
 
-  await sendNotification(
-    token,
-    "Challan Approved",
-    message
-  );
-}
+      const sellingRate =
+        parseFloat(
+          row.SELLINGRATE || 0
+        );
 
-// ===============================
+      const purchaseCost =
+        parseFloat(
+          row.purchasecost || 0
+        );
 
-    // ===============================
+      const lastSellingRate =
+        parseFloat(
+          row.LastSellingRate_c || 0
+        );
+
+      let alertTitle = "";
+      let alertMessage = "";
+
+      // LOSS ALERT
+
+      if (
+        sellingRate < purchaseCost
+      ) {
+
+        alertTitle =
+          "Challan Loss Alert";
+
+        alertMessage =
+          `Challan No. ${row.challanno} has been recorded at a loss.`;
+      }
+
+      // PRICE DROP ALERT
+
+      else if (
+        sellingRate < lastSellingRate
+      ) {
+
+        alertTitle =
+          "Price Drop Alert";
+
+        alertMessage =
+          `Challan No. ${row.challanno} selling rate is below last selling rate.`;
+      }
+
+      if (alertTitle !== "") {
+
+        const usersString =
+          userTable[0]?.USERS || "";
+
+        const users =
+          usersString
+            .split(",")
+            .map(x => x.trim())
+            .filter(x => x);
+
+        for (const targetUser of users) {
+
+          // SAVE NOTIFICATION
+
+          await pool.request()
+
+            .input(
+              "USERID",
+              sql.VarChar,
+              targetUser
+            )
+
+            .input(
+              "TITLE",
+              sql.VarChar,
+              alertTitle
+            )
+
+            .input(
+              "MESSAGE",
+              sql.NVarChar,
+              alertMessage
+            )
+
+            .input(
+              "REFERENCEID",
+              sql.VarChar,
+              challanUnq
+            )
+
+            .input(
+              "DATABASENAME",
+              sql.VarChar,
+              databaseName
+            )
+
+            .query(`
+              INSERT INTO APP_NOTIFICATION
+              (
+                USERID,
+                TITLE,
+                MESSAGE,
+                REFERENCEID,
+                DATABASENAME
+              )
+              VALUES
+              (
+                @USERID,
+                @TITLE,
+                @MESSAGE,
+                @REFERENCEID,
+                @DATABASENAME
+              )
+            `);
+
+          // PUSH NOTIFICATION
+
+          const tokenResult =
+            await companyPool.request()
+
+            .input(
+              "userId",
+              sql.VarChar,
+              targetUser
+            )
+
+            .query(`
+              SELECT DEVICETOKEN
+              FROM APP_DEVICE_TOKEN
+              WHERE USERID=@userId
+            `);
+
+          if (
+            tokenResult.recordset.length > 0
+          ) {
+
+            await sendNotification(
+              tokenResult.recordset[0].DEVICETOKEN,
+              alertTitle,
+              alertMessage
+            );
+          }
+        }
+      }
+    }
+
+    // =====================================
 
     res.json({
       success: true,
