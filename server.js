@@ -739,8 +739,8 @@ console.log(
     const dataTable =
       lossData.recordsets[3];
 
-       const challanno =
-      lossData.recordsets[0];
+       const challanNo =
+      lossData.recordsets[0]?.[0]?.challanno || "";
 
     if (
       userTable &&
@@ -792,10 +792,10 @@ console.log(
         sellingRate < purchaseCost
       ) {
 
-       alertTitle = "⚠️ Challan Loss Alert";
+       alertTitle = "Challan Loss Alert";
 
 alertMessage =
-  `Challan No: ${challanno.challanno}
+  `Challan No: ${challanNo}
 Branch: ${row.sm1002_7}
 Customer: ${row.custname}
 Product: ${row.sm206_7}
@@ -817,10 +817,10 @@ Please review and take necessary action.`;
         sellingRate < lastSellingRate
       ) {
 
-        alertTitle = "⚠️ Price Drop Alert";
+        alertTitle = "Price Drop Alert";
 
 alertMessage =
-  `Challan No: ${challanno.challanno}
+  `Challan No: ${challanNo}
 Branch: ${row.sm1002_7}
 Customer: ${row.custname}
 Product: ${row.sm206_7}
