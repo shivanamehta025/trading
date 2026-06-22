@@ -739,7 +739,7 @@ console.log(
     const dataTable =
       lossData.recordsets[3];
 
-       const challanNo =
+       const LchallanNo =
       lossData.recordsets[0]?.[0]?.challanno || "";
 
     if (
@@ -795,7 +795,7 @@ console.log(
        alertTitle = "Challan Loss Alert";
 
 alertMessage =
-  `Challan No: ${challanNo}
+  `Challan No: ${LchallanNo}
 Branch: ${row.sm1002_7}
 Customer: ${row.custname}
 Product: ${row.sm206_7}
@@ -820,7 +820,7 @@ Please review and take necessary action.`;
         alertTitle = "Price Drop Alert";
 
 alertMessage =
-  `Challan No: ${challanNo}
+  `Challan No: ${LchallanNo}
 Branch: ${row.sm1002_7}
 Customer: ${row.custname}
 Product: ${row.sm206_7}
