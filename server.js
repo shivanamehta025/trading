@@ -696,7 +696,7 @@ app.post("/api/challan-approval", async (req, res) => {
         challanUnq
       )
 
-      .execute("SP_FOR_SRL_APP");
+      .execute("A_SP_FOR_SRL_APP");
 
     const userTable =
       lossData.recordsets[2];
