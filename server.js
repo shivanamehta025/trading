@@ -681,22 +681,57 @@ app.post("/api/challan-approval", async (req, res) => {
     // CHALLAN LOSS / PRICE DROP ALERT
     // =====================================
 
-    const lossData =
-      await pool.request()
+   // =====================================
+// CHALLAN LOSS / PRICE DROP ALERT
+// =====================================
 
-      .input(
-        "what",
-        sql.VarChar,
-        "challanA"
-      )
+console.log("START LOSS CHECK");
+console.log("challanUnq =", challanUnq);
 
-      .input(
-        "LISTOFUNQID",
-        sql.VarChar,
-        challanUnq
-      )
+const lossData =
+  await pool.request()
 
-      .execute("A_SP_FOR_SRL_APP");
+  .input(
+    "what",
+    sql.VarChar,
+    "challanA"
+  )
+
+  .input(
+    "LISTOFUNQID",
+    sql.VarChar,
+    challanUnq
+  )
+
+  .execute("A_SP_FOR_SRL_APP");
+
+console.log("LOSS SP EXECUTED");
+
+console.log(
+  "Recordset Count =",
+  lossData.recordsets.length
+);
+
+lossData.recordsets.forEach(
+  (rs, index) => {
+
+    console.log(
+      `TABLE ${index}`
+    );
+
+    console.log(rs);
+  }
+);
+
+console.log(
+  "TABLE 2 ROWS =",
+  lossData.recordsets[2]?.length
+);
+
+console.log(
+  "TABLE 3 ROWS =",
+  lossData.recordsets[3]?.length
+);
 
     const userTable =
       lossData.recordsets[2];
@@ -713,6 +748,8 @@ app.post("/api/challan-approval", async (req, res) => {
 
       const row =
         dataTable[0];
+        console.log("LOSS DATA ROW");
+console.log(row);
 
       const sellingRate =
         parseFloat(
@@ -733,6 +770,20 @@ app.post("/api/challan-approval", async (req, res) => {
       let alertMessage = "";
 
       // LOSS ALERT
+      console.log(
+  "SELLINGRATE =",
+  row.SELLINGRATE
+);
+
+console.log(
+  "PURCHASECOST =",
+  row.purchasecost
+);
+
+console.log(
+  "LastSellingRate =",
+  row.LastSellingRate_c
+);
 
       if (
         sellingRate < purchaseCost
