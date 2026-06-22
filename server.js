@@ -739,6 +739,9 @@ console.log(
     const dataTable =
       lossData.recordsets[3];
 
+       const challanno =
+      lossData.recordsets[0];
+
     if (
       userTable &&
       userTable.length > 0 &&
@@ -789,11 +792,23 @@ console.log(
         sellingRate < purchaseCost
       ) {
 
-        alertTitle =
-          "Challan Loss Alert";
+       alertTitle = "⚠️ Challan Loss Alert";
 
-        alertMessage =
-          `Challan No. ${row.challanno} has been recorded at a loss.`;
+alertMessage =
+  `Challan No: ${challanno.challanno}
+Branch: ${row.sm1002_7}
+Customer: ${row.custname}
+Product: ${row.sm206_7}
+
+Purchase Cost: ₹${row.purchasecost}
+Selling Rate: ₹${row.SELLINGRATE}
+Last Selling Rate: ₹${row.LastSellingRate_c}
+
+Selling Qty: ${row.Qty} KG
+Last Profit %: ${row.LastProfitPercent}%
+Total Loss: ₹${row.LossAmount}
+
+Please review and take necessary action.`;
       }
 
       // PRICE DROP ALERT
@@ -802,11 +817,27 @@ console.log(
         sellingRate < lastSellingRate
       ) {
 
-        alertTitle =
-          "Price Drop Alert";
+        alertTitle = "⚠️ Price Drop Alert";
 
-        alertMessage =
-          `Challan No. ${row.challanno} selling rate is below last selling rate.`;
+alertMessage =
+  `Challan No: ${challanno.challanno}
+Branch: ${row.sm1002_7}
+Customer: ${row.custname}
+Product: ${row.sm206_7}
+
+Purchase Cost: ₹${row.purchasecost}
+Last Selling Rate: ₹${row.LastSellingRate_c}
+Current Selling Rate: ₹${row.SELLINGRATE}
+
+Difference: ₹${(
+  lastSellingRate - sellingRate
+).toFixed(2)}
+
+Selling Qty: ${row.Qty} KG
+Last Profit %: ${row.LastProfitPercent}%
+Current Profit %: ${row.CurrentProfitPercent}%
+
+Please review the pricing decision.`;
       }
 
       if (alertTitle !== "") {
