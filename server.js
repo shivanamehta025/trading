@@ -1695,24 +1695,31 @@ app.post("/api/sales-dashboard", async (req, res) => {
 
     res.json({
 
-      success: true,
+  success: true,
 
-      mtdSales:
-          result.recordsets[0][0]
-              ?.MTDSALES ?? 0,
+  MTDSALES:
+      result.recordsets[0][0]
+          ?.MTDSALES ?? 0,
 
-      todaySales:
-          result.recordsets[1][0]
-              ?.TODAYSALES ?? 0,
+  TODAYSALES:
+      result.recordsets[1][0]
+          ?.TODAYSALES ?? 0,
 
-      totalChallans:
-          result.recordsets[2][0]
-              ?.TOTALCHALLANS ?? 0,
+  TOTALCHALLANS:
+      result.recordsets[2][0]
+          ?.TOTALCHALLANS ?? 0,
 
-      customers:
-          result.recordsets[3][0]
-              ?.CUSTOMERS ?? 0,
-    });
+  CUSTOMERS:
+      result.recordsets[3][0]
+          ?.CUSTOMERS ?? 0,
+
+  GROWTHPERCENT:
+      result.recordsets[5]?.[0]
+          ?.GROWTHPERCENT ?? 0,
+
+  MONTHLYTREND:
+      result.recordsets[4] ?? []
+});
 
   } catch (err) {
 
