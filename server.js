@@ -1488,21 +1488,7 @@ app.post("/api/create-srl-notification", async (req, res) => {
     // GET DEVICE TOKEN
     // ==========================
 					 
-					
-					  
-						  
-						  
-			 
-				  
-			 
-					  
-					 
-					   
-						   
-						   
-			 
-			 
-
+			
     const tokenResult =
       await companyPool.request()
 
@@ -1556,8 +1542,7 @@ app.post("/api/create-srl-notification", async (req, res) => {
   }
 });
 
-app.post(
-  "/api/create-challan-notification",
+app.post("/api/create-challan-notification",
   async (req, res) => {
 
     try {
@@ -1675,6 +1660,71 @@ app.post(
         message: err.message
       });
     }
+});
+
+app.post("/api/sales-dashboard", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName,
+      userId
+    } = req.body;
+
+    const pool =
+      await getPool(databaseName);
+
+    const result =
+      await pool.request()
+
+      .input(
+        "WHAT",
+        sql.VarChar,
+        "SALES"
+      )
+
+      .input(
+        "USERID",
+        sql.VarChar,
+        userId
+      )
+
+      .execute(
+        "A_SP_FOR_DASHBOARD_APP"
+      );
+
+    res.json({
+
+      success: true,
+
+      mtdSales:
+          result.recordsets[0][0]
+              ?.MTDSALES ?? 0,
+
+      todaySales:
+          result.recordsets[1][0]
+              ?.TODAYSALES ?? 0,
+
+      totalChallans:
+          result.recordsets[2][0]
+              ?.TOTALCHALLANS ?? 0,
+
+      customers:
+          result.recordsets[3][0]
+              ?.CUSTOMERS ?? 0,
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+
+      success: false,
+
+      message: err.message,
+    });
+  }
 });
 // ─────────────────────────────────────────────────────
 // START SERVER
