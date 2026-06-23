@@ -1536,6 +1536,126 @@ app.post("/api/create-srl-notification", async (req, res) => {
   }
 });
 
+app.post(
+  "/api/create-challan-notification",
+  async (req, res) => {
+
+    try {
+
+      const {
+        databaseName,
+        referenceId,
+        targetUser,
+        title,
+        message
+      } = req.body;
+
+      const pool =
+        await getPool(databaseName);
+
+      const companyPool =
+        await getPool();
+
+      const users =
+        targetUser
+          .split(",")
+          .map(x => x.trim());
+
+      for (const user of users) {
+
+        await pool.request()
+
+          .input(
+            "USERID",
+            sql.VarChar,
+            user
+          )
+
+          .input(
+            "TITLE",
+            sql.VarChar,
+            title
+          )
+
+          .input(
+            "MESSAGE",
+            sql.NVarChar,
+            message
+          )
+
+          .input(
+            "REFERENCEID",
+            sql.VarChar,
+            referenceId
+          )
+
+          .input(
+            "DATABASENAME",
+            sql.VarChar,
+            databaseName
+          )
+
+          .query(`
+            INSERT INTO APP_NOTIFICATION
+            (
+              USERID,
+              TITLE,
+              MESSAGE,
+              REFERENCEID,
+              DATABASENAME
+            )
+            VALUES
+            (
+              @USERID,
+              @TITLE,
+              @MESSAGE,
+              @REFERENCEID,
+              @DATABASENAME
+            )
+          `);
+
+        const tokenResult =
+          await companyPool.request()
+
+          .input(
+            "userId",
+            sql.VarChar,
+            user
+          )
+
+          .query(`
+            SELECT DEVICETOKEN
+            FROM APP_DEVICE_TOKEN
+            WHERE USERID=@userId
+          `);
+
+        if (
+          tokenResult.recordset.length > 0
+        ) {
+
+          await sendNotification(
+            tokenResult.recordset[0]
+              .DEVICETOKEN,
+            title,
+            message
+          );
+        }
+      }
+
+      res.json({
+        success: true
+      });
+
+    } catch (err) {
+
+      console.log(err);
+
+      res.status(500).json({
+        success: false,
+        message: err.message
+      });
+    }
+});
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
