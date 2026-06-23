@@ -1407,22 +1407,27 @@ app.post("/api/create-srl-notification", async (req, res) => {
     const {
       databaseName,
       referenceId,
-      orderNo,
-      targetUser
+      targetUser,
+	   title,
+        message
     } = req.body;
 
     const pool =
       await getPool(databaseName);
+					
+				   
+			  
+			   
+				   
 
     const companyPool =
       await getPool();
 
-    const message =
-      `Order No. ${orderNo} requires approval.`;
 
     // ==========================
     // SAVE NOTIFICATION
     // ==========================
+							  
 
     await pool.request()
 
@@ -1435,7 +1440,7 @@ app.post("/api/create-srl-notification", async (req, res) => {
       .input(
         "TITLE",
         sql.VarChar,
-        "New SRL"
+        title
       )
 
       .input(
@@ -1482,6 +1487,21 @@ app.post("/api/create-srl-notification", async (req, res) => {
     // ==========================
     // GET DEVICE TOKEN
     // ==========================
+					 
+					
+					  
+						  
+						  
+			 
+				  
+			 
+					  
+					 
+					   
+						   
+						   
+			 
+			 
 
     const tokenResult =
       await companyPool.request()
@@ -1505,7 +1525,7 @@ app.post("/api/create-srl-notification", async (req, res) => {
     if (
       tokenResult.recordset.length > 0
     ) {
-
+				  
       const token =
         tokenResult.recordset[0]
           .DEVICETOKEN;
@@ -1514,7 +1534,7 @@ app.post("/api/create-srl-notification", async (req, res) => {
 
         token,
 
-        "New SRL",
+        "New SRL Approval",
 
         message
       );
