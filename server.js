@@ -1733,6 +1733,37 @@ app.post("/api/sales-dashboard", async (req, res) => {
     });
   }
 });
+
+app.post("/api/chat-users", async (req, res) => {
+
+  try {
+
+    const pool = await getPool();
+
+    const result =
+      await pool.request()
+
+      .query(`
+        SELECT
+            SM63_5 AS USERID,
+            SM63_6 AS USERNAME
+        FROM SM63
+        ORDER BY SM63_6
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
