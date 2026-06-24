@@ -1824,9 +1824,13 @@ app.post("/api/chat-users", async (req, res) => {
 
   try {
 
-    const { userId } = req.body;
+    const {
+      databaseName,
+      userId
+    } = req.body;
 
-    const pool = await getPool();
+    const pool =
+      await getPool(databaseName);
 
     const result =
       await pool.request()
@@ -1838,36 +1842,57 @@ app.post("/api/chat-users", async (req, res) => {
       )
 
       .query(`
+
 SELECT
-    CASE
-        WHEN FROMUSER=@USERID
-            THEN TOUSER
-        ELSE FROMUSER
-    END AS CHATUSER,
 
-    MAX(CREATEDON) AS LASTMESSAGEDATE,
+CASE
+WHEN c.FROMUSER=@USERID
+THEN c.TOUSER
+ELSE c.FROMUSER
+END AS USERID,
 
-    SUM(
-        CASE
-            WHEN TOUSER=@USERID
-            AND ISREAD=0
-            THEN 1
-            ELSE 0
-        END
-    ) AS UNREADCOUNT
+s.SM63_6 AS USERNAME,
 
-FROM APP_CHAT
+MAX(c.CREATEDON) AS LASTMESSAGEDATE,
+
+SUM(
+CASE
+WHEN c.TOUSER=@USERID
+AND ISNULL(c.ISREAD,0)=0
+THEN 1
+ELSE 0
+END
+) AS UNREADCOUNT
+
+FROM APP_CHAT c
+
+LEFT JOIN SM63 s
+
+ON s.SM63_5 =
+
+CASE
+WHEN c.FROMUSER=@USERID
+THEN c.TOUSER
+ELSE c.FROMUSER
+END
 
 WHERE
-    FROMUSER=@USERID
-    OR TOUSER=@USERID
+c.FROMUSER=@USERID
+OR c.TOUSER=@USERID
 
 GROUP BY
-    CASE
-        WHEN FROMUSER=@USERID
-        THEN TOUSER
-        ELSE FROMUSER
-    END
+
+CASE
+WHEN c.FROMUSER=@USERID
+THEN c.TOUSER
+ELSE c.FROMUSER
+END,
+
+s.SM63_6
+
+ORDER BY
+MAX(c.CREATEDON) DESC
+
 `);
 
     res.json({
@@ -1965,6 +1990,44 @@ MAX(CREATEDON) DESC
 
 res.json(result.recordset);
 
+});
+
+app.post("/api/all-users", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName
+    } = req.body;
+
+    const pool =
+      await getPool(databaseName);
+
+    const result =
+      await pool.request()
+
+      .query(`
+        SELECT
+          SM63_5 AS USERID,
+          SM63_6 AS USERNAME
+        FROM SM63
+        ORDER BY SM63_6
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
 });
 // ─────────────────────────────────────────────────────
 // START SERVER
