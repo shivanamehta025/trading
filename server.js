@@ -1824,43 +1824,51 @@ app.post("/api/chat-users", async (req, res) => {
 
   try {
 
+    const { userId } = req.body;
+
     const pool = await getPool();
 
     const result =
       await pool.request()
 
+      .input(
+        "USERID",
+        sql.VarChar,
+        userId
+      )
+
       .query(`
-      SELECT
-CASE
-    WHEN FROMUSER=@USERID
-        THEN TOUSER
-    ELSE FROMUSER
-END AS CHATUSER,
+SELECT
+    CASE
+        WHEN FROMUSER=@USERID
+            THEN TOUSER
+        ELSE FROMUSER
+    END AS CHATUSER,
 
-MAX(CREATEDON) AS LASTMESSAGEDATE,
+    MAX(CREATEDON) AS LASTMESSAGEDATE,
 
-SUM(
-CASE
-WHEN TOUSER=@USERID
-AND ISREAD=0
-THEN 1
-ELSE 0
-END
-) AS UNREADCOUNT
+    SUM(
+        CASE
+            WHEN TOUSER=@USERID
+            AND ISREAD=0
+            THEN 1
+            ELSE 0
+        END
+    ) AS UNREADCOUNT
 
 FROM APP_CHAT
 
 WHERE
-FROMUSER=@USERID
-OR TOUSER=@USERID
+    FROMUSER=@USERID
+    OR TOUSER=@USERID
 
 GROUP BY
-CASE
-WHEN FROMUSER=@USERID
-THEN TOUSER
-ELSE FROMUSER
-END
-      `);
+    CASE
+        WHEN FROMUSER=@USERID
+        THEN TOUSER
+        ELSE FROMUSER
+    END
+`);
 
     res.json({
       success: true,
@@ -1868,6 +1876,8 @@ END
     });
 
   } catch (err) {
+
+    console.log(err);
 
     res.status(500).json({
       success: false,
