@@ -1300,6 +1300,10 @@ app.post("/api/send-chat", async (req, res) => {
     const pool =
       await getPool(databaseName);
 
+    // ==========================
+    // SAVE CHAT MESSAGE
+    // ==========================
+
     await pool.request()
 
       .input(
@@ -1343,14 +1347,138 @@ app.post("/api/send-chat", async (req, res) => {
         )
       `);
 
+    // ==========================
+    // GET SENDER NAME
+    // ==========================
+
+    const senderResult =
+      await pool.request()
+
+      .input(
+        "USERID",
+        sql.VarChar,
+        fromUser
+      )
+
+      .query(`
+        SELECT SM63_6 AS USERNAME
+        FROM SM63
+        WHERE SM63_5=@USERID
+      `);
+
+    const senderName =
+      senderResult.recordset[0]
+        ?.USERNAME ||
+      fromUser;
+
+    // ==========================
+    // SAVE NOTIFICATION
+    // ==========================
+
+    await pool.request()
+
+      .input(
+        "USERID",
+        sql.VarChar,
+        toUser
+      )
+
+      .input(
+        "TITLE",
+        sql.VarChar,
+        senderName
+      )
+
+      .input(
+        "MESSAGE",
+        sql.NVarChar,
+        message
+      )
+
+      .input(
+        "REFERENCEID",
+        sql.VarChar,
+        referenceId
+      )
+
+      .input(
+        "DATABASENAME",
+        sql.VarChar,
+        databaseName
+      )
+
+      .query(`
+        INSERT INTO APP_NOTIFICATION
+        (
+          USERID,
+          TITLE,
+          MESSAGE,
+          REFERENCEID,
+          DATABASENAME
+        )
+        VALUES
+        (
+          @USERID,
+          @TITLE,
+          @MESSAGE,
+          @REFERENCEID,
+          @DATABASENAME
+        )
+      `);
+
+    // ==========================
+    // SEND PUSH NOTIFICATION
+    // ==========================
+
+    const companyPool =
+      await getPool();
+
+    const tokenResult =
+      await companyPool.request()
+
+      .input(
+        "USERID",
+        sql.VarChar,
+        toUser
+      )
+
+      .query(`
+        SELECT DEVICETOKEN
+        FROM APP_DEVICE_TOKEN
+        WHERE USERID=@USERID
+      `);
+
+    if (
+      tokenResult.recordset.length > 0
+    ) {
+
+      const token =
+        tokenResult.recordset[0]
+          .DEVICETOKEN;
+
+      await sendNotification(
+
+        token,
+
+        senderName,
+
+        message
+      );
+    }
+
     res.json({
+
       success: true
     });
 
   } catch (err) {
 
+    console.log(err);
+
     res.status(500).json({
+
       success: false,
+
       message: err.message
     });
   }
@@ -1763,6 +1891,87 @@ app.post("/api/chat-users", async (req, res) => {
       message: err.message
     });
   }
+});
+
+app.post("/api/read-chat", async (req, res) => {
+
+  const {
+    databaseName,
+    currentUser,
+    targetUser
+  } = req.body;
+
+  const pool =
+    await getPool(databaseName);
+
+  await pool.request()
+
+    .input("CURRENTUSER", sql.VarChar, currentUser)
+    .input("TARGETUSER", sql.VarChar, targetUser)
+
+    .query(`
+      UPDATE APP_CHAT
+      SET ISREAD = 1
+      WHERE TOUSER=@CURRENTUSER
+      AND FROMUSER=@TARGETUSER
+      AND ISREAD=0
+    `);
+
+  res.json({ success:true });
+});
+
+app.post("/api/chat-list", async (req,res)=>{
+
+  const {
+    databaseName,
+    userId
+  } = req.body;
+
+  const pool =
+    await getPool(databaseName);
+
+  const result =
+    await pool.request()
+
+    .input(
+      "USERID",
+      sql.VarChar,
+      userId
+    )
+
+    .query(`
+
+SELECT
+
+CASE
+WHEN FROMUSER=@USERID
+THEN TOUSER
+ELSE FROMUSER
+END AS CHATUSER,
+
+MAX(CREATEDON) CREATEDON
+
+FROM APP_CHAT
+
+WHERE
+FROMUSER=@USERID
+OR TOUSER=@USERID
+
+GROUP BY
+
+CASE
+WHEN FROMUSER=@USERID
+THEN TOUSER
+ELSE FROMUSER
+END
+
+ORDER BY
+MAX(CREATEDON) DESC
+
+`);
+
+res.json(result.recordset);
+
 });
 // ─────────────────────────────────────────────────────
 // START SERVER
