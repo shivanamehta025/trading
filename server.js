@@ -1409,17 +1409,28 @@ if (fromUser !== toUser) {
 
   await sendNotification(
 
-    row.DEVICETOKEN,
+  row.DEVICETOKEN,
 
-    senderName,
+  senderName,
 
-    message,
-     {
+  message,
+
+  {
     type: "CHAT",
-    fromUser,
-    referenceId
+
+    fromUser:
+      fromUser,
+
+    fromName:
+      senderName,
+
+    referenceId:
+      referenceId,
+
+    databaseName:
+      databaseName
   }
-  );
+);
 }
     }
   }
