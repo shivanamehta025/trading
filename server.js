@@ -1138,6 +1138,8 @@ app.post("/api/notifications", async (req, res) => {
  USERID,
  TITLE,
  MESSAGE,
+ FROMUSER,
+DOCUMENTTYPE,
  ISREAD,
  CREATEDON,
  REFERENCEID,
@@ -1382,6 +1384,9 @@ app.post("/api/send-chat", async (req, res) => {
         sql.VarChar,
         toUser
       )
+      .input("FROMUSER", sql.VarChar, fromUser)
+
+      .input("DOCUMENTTYPE", sql.VarChar, "CHAT")
 
       .input(
         "TITLE",
@@ -1411,6 +1416,8 @@ app.post("/api/send-chat", async (req, res) => {
         INSERT INTO APP_NOTIFICATION
         (
           USERID,
+          FROMUSER,
+          DOCUMENTTYPE,
           TITLE,
           MESSAGE,
           REFERENCEID,
@@ -1419,6 +1426,8 @@ app.post("/api/send-chat", async (req, res) => {
         VALUES
         (
           @USERID,
+          @FROMUSER,
+          @DOCUMENTTYPE,
           @TITLE,
           @MESSAGE,
           @REFERENCEID,
