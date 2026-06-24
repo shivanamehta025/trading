@@ -1373,67 +1373,7 @@ app.post("/api/send-chat", async (req, res) => {
         ?.USERNAME ||
       fromUser;
 
-    // ==========================
-    // SAVE NOTIFICATION
-    // ==========================
 
-    await pool.request()
-
-      .input(
-        "USERID",
-        sql.VarChar,
-        toUser
-      )
-      .input("FROMUSER", sql.VarChar, fromUser)
-
-      .input("DOCUMENTTYPE", sql.VarChar, "CHAT")
-
-      .input(
-        "TITLE",
-        sql.VarChar,
-        senderName
-      )
-
-      .input(
-        "MESSAGE",
-        sql.NVarChar,
-        message
-      )
-
-      .input(
-        "REFERENCEID",
-        sql.VarChar,
-        referenceId
-      )
-
-      .input(
-        "DATABASENAME",
-        sql.VarChar,
-        databaseName
-      )
-
-      .query(`
-        INSERT INTO APP_NOTIFICATION
-        (
-          USERID,
-          FROMUSER,
-          DOCUMENTTYPE,
-          TITLE,
-          MESSAGE,
-          REFERENCEID,
-          DATABASENAME
-        )
-        VALUES
-        (
-          @USERID,
-          @FROMUSER,
-          @DOCUMENTTYPE,
-          @TITLE,
-          @MESSAGE,
-          @REFERENCEID,
-          @DATABASENAME
-        )
-      `);
 
     // ==========================
     // SEND PUSH NOTIFICATION
@@ -1464,16 +1404,25 @@ app.post("/api/send-chat", async (req, res) => {
       const token =
         tokenResult.recordset[0]
           .DEVICETOKEN;
+if (fromUser !== toUser) {
+      for (const row of tokenResult.recordset) {
 
-      await sendNotification(
+  await sendNotification(
 
-        token,
+    row.DEVICETOKEN,
 
-        senderName,
+    senderName,
 
-        message
-      );
+    message,
+     {
+    type: "CHAT",
+    fromUser,
+    referenceId
+  }
+  );
+}
     }
+  }
 
     res.json({
 
@@ -1881,11 +1830,36 @@ app.post("/api/chat-users", async (req, res) => {
       await pool.request()
 
       .query(`
-        SELECT
-            SM63_5 AS USERID,
-            SM63_6 AS USERNAME
-        FROM SM63
-        ORDER BY SM63_6
+      SELECT
+CASE
+    WHEN FROMUSER=@USERID
+        THEN TOUSER
+    ELSE FROMUSER
+END AS CHATUSER,
+
+MAX(CREATEDON) AS LASTMESSAGEDATE,
+
+SUM(
+CASE
+WHEN TOUSER=@USERID
+AND ISREAD=0
+THEN 1
+ELSE 0
+END
+) AS UNREADCOUNT
+
+FROM APP_CHAT
+
+WHERE
+FROMUSER=@USERID
+OR TOUSER=@USERID
+
+GROUP BY
+CASE
+WHEN FROMUSER=@USERID
+THEN TOUSER
+ELSE FROMUSER
+END
       `);
 
     res.json({
