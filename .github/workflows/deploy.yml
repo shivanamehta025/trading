@@ -1,4 +1,4 @@
-name: Deploy Backend
+name: Deploy Backend to Windows Server
 
 on:
   push:
@@ -10,10 +10,10 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Update backend
+      - name: Update Backend
         shell: cmd
         run: |
           cd /d G:\qbackend\backend_mssql
           git fetch origin
           git reset --hard origin/main
-          npm install
+          call npm install
