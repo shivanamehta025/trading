@@ -6,57 +6,35 @@ async function sendNotification(
   body,
   data = {}
 ) {
-//hello world
-  try {
-
-    await admin.messaging().send({
-
-      token,
-
-      notification: {
-
-        title,
-
-        body,
+const payload = {
+  token,
+  notification: {
+    title,
+    body,
+  },
+  data: {
+    type: String(data.type ?? ""),
+    fromUser: String(data.fromUser ?? ""),
+    fromName: String(data.fromName ?? ""),
+    referenceId: String(data.referenceId ?? ""),
+    databaseName: String(data.databaseName ?? ""),
+  },
+  android: {
+    priority: "high",
+  },
+  apns: {
+    payload: {
+      aps: {
+        sound: "default",
       },
+    },
+  },
+};
 
-      data: {
+console.log("FCM Payload:");
+console.log(JSON.stringify(payload, null, 2));
 
-        type: String(data.type ?? ""),
-
-        fromUser: String(data.fromUser ?? ""),
-
-        fromName: String(data.fromName ?? ""),
-
-        referenceId: String(data.referenceId ?? ""),
-
-        databaseName: String(data.databaseName ?? ""),
-      },
-
-      android: {
-
-        priority: "high",
-      },
-
-      apns: {
-
-        payload: {
-
-          aps: {
-
-            sound: "default",
-          },
-        },
-      },
-    });
-
-    console.log("✅ Notification Sent");
-
-  } catch (err) {
-
-    console.log(err);
-
-  }
+await admin.messaging().send(payload);
 
 }
 
