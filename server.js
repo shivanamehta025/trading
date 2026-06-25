@@ -1815,7 +1815,10 @@ app.post("/api/sales-dashboard", async (req, res) => {
           ?.GROWTHPERCENT ?? 0,
 
   MONTHLYTREND:
-      result.recordsets[4] ?? []
+      result.recordsets[4] ?? [],
+
+      DUEAMOUNT:
+      result.recordsets[6]?.[0]?.DUEAMOUNT ?? 0
 });
 
   } catch (err) {
