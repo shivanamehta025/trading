@@ -17,7 +17,7 @@ async function getPool(databaseName) {
   const config = {
     user: process.env.DB_USER || "Administrator",
     password: process.env.DB_PASSWORD || "ggf@fsha_5!58ar4",
-    server: "103.123.53.84",
+    server: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT) || 5000,
 
     database: dbName,
