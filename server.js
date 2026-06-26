@@ -1810,9 +1810,9 @@ app.post("/api/sales-dashboard", async (req, res) => {
       result.recordsets[3][0]
           ?.CUSTOMERS ?? 0,
 
-  GROWTHPERCENT:
-      result.recordsets[5]?.[0]
-          ?.GROWTHPERCENT ?? 0,
+  GROWTHPERCENT:result.recordsets[5]?.[0]?.GROWTHPERCENT ?? 0,
+  CURRENTMTD: result.recordsets[5]?.[0]?.CurrentMTD ?? 0,
+  LASTMTD: result.recordsets[5]?.[0]?.LastMTD ?? 0,
 
   MONTHLYTREND:
       result.recordsets[4] ?? [],
