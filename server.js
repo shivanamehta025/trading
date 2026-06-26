@@ -1820,7 +1820,9 @@ app.post("/api/sales-dashboard", async (req, res) => {
       DUEAMOUNT:
       result.recordsets[6]?.[0]?.DUEAMOUNT ?? 0,
 
-      TOPDUECUSTOMERS: result.recordsets[7] ?? []
+      TOPDUECUSTOMERS: result.recordsets[7] ?? [],
+
+      TODAYSALESLIST: result.recordsets[8] ?? []
 });
 
   } catch (err) {
