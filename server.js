@@ -2182,6 +2182,37 @@ app.post("/api/all-users", async (req, res) => {
     });
   }
 });
+
+app.post("/api/customer-follow-up", async (req, res) => {
+
+  try {
+
+    const { databaseName, userId } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+
+      .input("WHAT", sql.VarChar, "CUSTOMER_FOLLOW_UP")
+      .input("USERID", sql.VarChar, userId)
+
+      .execute("A_SP_FOR_DASHBOARD_APP");
+
+    res.json({
+      success: true,
+      customers: result.recordset,
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+
+  }
+
+});
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
