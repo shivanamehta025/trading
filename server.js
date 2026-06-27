@@ -1824,7 +1824,7 @@ app.post("/api/sales-dashboard", async (req, res) => {
 
       TODAYSALESLIST: result.recordsets[8] ?? [],
       
-      weeklyTrend : result.recordsets[9]?? [],
+      //weeklyTrend : result.recordsets[9]?? [],
 
       TOPDUECUSTOMERSBYDUEDAYS: result.recordsets[9] ?? [],
 });
