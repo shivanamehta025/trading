@@ -2218,7 +2218,7 @@ app.post("/api/customer-follow-up", async (req, res) => {
 
 app.post("/api/lost-customers", async (req, res) => {
   try {
-    const { databaseName, userId } = req.body;
+    const { databaseName, userId , filter} = req.body;
 
     const pool = await getPool(databaseName);
 
