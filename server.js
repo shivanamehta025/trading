@@ -2215,6 +2215,28 @@ app.post("/api/customer-follow-up", async (req, res) => {
   }
 
 });
+
+app.post("/api/lost-customers", async (req, res) => {
+  try {
+    const { databaseName, userId } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+   .request()
+.input("what", sql.VarChar, "LOST_CUSTOMERS")
+.input("userid", sql.VarChar, userId)
+.input("filter", sql.VarChar, filter)
+.execute("A_SP_FOR_DASHBOARD_APP");
+
+    res.json(result.recordset);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: err.message,
+    });
+  }
+});
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
