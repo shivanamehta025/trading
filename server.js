@@ -1797,15 +1797,7 @@ app.post("/api/sales-dashboard", async (req, res) => {
   MTDSALES:
       result.recordsets[0][0]
           ?.MTDSALES ?? 0,
-            CurrentQty: result.recordsets[0][0]?.CurrentQty ?? 0,
-      avgLast3MonthsQty:
-          result.recordsets[0][0]?.avgLast3MonthsQty ?? 0,
-      TargetQty: result.recordsets[0][0]?.TargetQty ?? 0,
-      RemainingQty:
-          result.recordsets[0][0]?.RemainingQty ?? 0,
-      AchievementPercent:
-          result.recordsets[0][0]?.AchievementPercent ?? 0,
-
+           
   TODAYSALES:
       result.recordsets[1][0]
           ?.TODAYSALES ?? 0,
@@ -1835,6 +1827,13 @@ app.post("/api/sales-dashboard", async (req, res) => {
       //weeklyTrend : result.recordsets[9]?? [],
 
       TOPDUECUSTOMERSBYDUEDAYS: result.recordsets[9] ?? [],
+
+      CurrentQty: result.recordsets[11][0]?.CurrentQty ?? 0,
+      avgLast3MonthsQty:result.recordsets[11][0]?.avgLast3MonthsQty ?? 0,
+      TargetQty: result.recordsets[11][0]?.TargetQty ?? 0,
+      RemainingQty: result.recordsets[11][0]?.RemainingQty ?? 0,
+      AchievementPercent: result.recordsets[11][0]?.AchievementPercent ?? 0,
+
 });
 
   } catch (err) {
