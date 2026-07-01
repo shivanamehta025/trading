@@ -1834,6 +1834,8 @@ app.post("/api/sales-dashboard", async (req, res) => {
       RemainingQty: result.recordsets[11][0]?.RemainingQty ?? 0,
       ExcessQty: result.recordsets[11][0]?.ExcessQty ?? 0,
       AchievementPercent: result.recordsets[11][0]?.AchievementPercent ?? 0,
+      //MonthlyTarget: result.recordsets[11][0]?.MonthlyTarget ?? 0,
+      MTDTarget: result.recordsets[11][0]?.MTDTarget ?? 0,
 
 });
 
