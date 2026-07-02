@@ -1835,7 +1835,7 @@ app.post("/api/sales-dashboard", async (req, res) => {
       ExcessQty: result.recordsets[11][0]?.ExcessQty ?? 0,
       AchievementPercent: result.recordsets[11][0]?.AchievementPercent ?? 0,
       //MonthlyTarget: result.recordsets[11][0]?.MonthlyTarget ?? 0,
-      MTDTarget: result.recordsets[11][0]?.MTDTarget ?? 0,
+     // MTDTarget: result.recordsets[11][0]?.MTDTarget ?? 0,
 
 });
 
@@ -2253,6 +2253,34 @@ app.post("/api/lost-customers", async (req, res) => {
     res.status(500).json({
       error: err.message,
     });
+  }
+});
+
+app.post('/api/category-target', async (req, res) => {
+  try {
+
+    const { databaseName, userId } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+
+      .input('WHAT', sql.NVarChar(100), 'CATEGORYWISE_TARGET')
+      .input('USERID', sql.NVarChar(100), userId)
+
+      .execute('A_SP_FOR_DASHBOARD_APP');
+
+    res.json(result.recordset);
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+
   }
 });
 // ─────────────────────────────────────────────────────
