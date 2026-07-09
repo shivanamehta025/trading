@@ -2262,6 +2262,7 @@ app.post("/api/lost-customers", async (req, res) => {
 });
 
 app.post('/api/category-target', async (req, res) => {
+
   try {
 
     const { databaseName, userId } = req.body;
@@ -2275,7 +2276,13 @@ app.post('/api/category-target', async (req, res) => {
 
       .execute('A_SP_FOR_DASHBOARD_APP');
 
-    res.json(result.recordset);
+    res.json({
+
+      list: result.recordsets[0],
+
+      summary: result.recordsets[1][0]
+
+    });
 
   } catch (err) {
 
@@ -2287,6 +2294,7 @@ app.post('/api/category-target', async (req, res) => {
     });
 
   }
+
 });
 
 app.post('/api/customer-health', async (req, res) => {
