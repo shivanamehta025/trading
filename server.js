@@ -2469,6 +2469,38 @@ app.post('/api/customer-products', async (req, res) => {
   }
 
 });
+
+app.post('/api/product-growth-details', async (req, res) => {
+
+  try {
+
+    const { databaseName, userId, period } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+
+      .input('WHAT', sql.NVarChar(100), 'PRODUCT_GROWTH_DETAILS')
+
+      .input('USERID', sql.NVarChar(100), userId)
+
+      .input('PERIOD', sql.NVarChar(10), period)
+
+      .execute('A_SP_FOR_DASHBOARD_APP');
+
+    res.json(result.recordset);
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      message: err.message,
+    });
+
+  }
+
+});
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
