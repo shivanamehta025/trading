@@ -2503,7 +2503,7 @@ app.post('/api/product-growth-details', async (req, res) => {
 });
 
 app.post(
-  "/category-best-month-customers",
+  "api/category-best-month-customers",
   async (req, res) => {
     try {
       const {
