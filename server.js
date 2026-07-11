@@ -2508,7 +2508,7 @@ app.post(
     try {
       const {
         databaseName,
-        salesPerson,
+        userId,
         categoryId,
         year,
         month,
@@ -2527,12 +2527,7 @@ app.post(
         });
       }
 
-      if (!salesPerson) {
-        return res.status(400).json({
-          success: false,
-          message: "salesPerson is required",
-        });
-      }
+      
 
       if (!categoryId) {
         return res.status(400).json({
@@ -2559,11 +2554,7 @@ app.post(
           "CATEGORY_BEST_MONTH_CUSTOMERS"
         )
 
-        .input(
-          "SALESPERSON",
-          sql.VarChar,
-          salesPerson
-        )
+         .input('USERID', sql.NVarChar(100), userId)
 
         .input(
           "CATEGORYID",
