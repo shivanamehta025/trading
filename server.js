@@ -2501,6 +2501,113 @@ app.post('/api/product-growth-details', async (req, res) => {
   }
 
 });
+
+app.post(
+  "/category-best-month-customers",
+  async (req, res) => {
+    try {
+      const {
+        databaseName,
+        salesPerson,
+        categoryId,
+        year,
+        month,
+      } = req.body;
+
+      console.log(
+        "CATEGORY BEST MONTH REQUEST:",
+        req.body
+      );
+
+      // VALIDATION
+      if (!databaseName) {
+        return res.status(400).json({
+          success: false,
+          message: "databaseName is required",
+        });
+      }
+
+      if (!salesPerson) {
+        return res.status(400).json({
+          success: false,
+          message: "salesPerson is required",
+        });
+      }
+
+      if (!categoryId) {
+        return res.status(400).json({
+          success: false,
+          message: "categoryName is required",
+        });
+      }
+
+      if (!year || !month) {
+        return res.status(400).json({
+          success: false,
+          message: "Best month year and month are required",
+        });
+      }
+
+      const pool = await getPool(databaseName);
+
+      const result = await pool
+        .request()
+
+        .input(
+          "WHAT",
+          sql.VarChar,
+          "CATEGORY_BEST_MONTH_CUSTOMERS"
+        )
+
+        .input(
+          "SALESPERSON",
+          sql.VarChar,
+          salesPerson
+        )
+
+        .input(
+          "CATEGORYID",
+          sql.VarChar,
+          categoryId
+        )
+
+        .input(
+          "BESTMONTHYEAR",
+          sql.Int,
+          parseInt(year)
+        )
+
+        .input(
+          "BESTMONTHNO",
+          sql.Int,
+          parseInt(month)
+        )
+
+        .execute("A_SP_FOR_DASHBOARD_APP");
+
+      console.log(
+        "CATEGORY BEST MONTH CUSTOMERS:",
+        result.recordset
+      );
+
+      res.json({
+        success: true,
+        data: result.recordset,
+      });
+
+    } catch (error) {
+      console.error(
+        "CATEGORY BEST MONTH CUSTOMER ERROR:",
+        error
+      );
+
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+);
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
