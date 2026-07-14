@@ -1811,13 +1811,61 @@ app.post("/api/sales-dashboard", async (req, res) => {
           ?.CUSTOMERS ?? 0,
 
  
-  CURRENTMTD: result.recordsets[5]?.[0]?.CurrentMTD ?? 0,
-  LASTMTD: result.recordsets[5]?.[0]?.LastMTD ?? 0,
-  MTDGROWTHPERCENT:result.recordsets[5]?.[0]?.MTDGrowthPercent ?? 0,
-  
-  CURRENTYTD: result.recordsets[5]?.[0]?.CurrentYTD ?? 0,
-  LASTYTD: result.recordsets[5]?.[0]?.LastYTD ?? 0,
-  YTDGROWTHPERCENT:result.recordsets[5]?.[0]?.YTDGrowthPercent ?? 0,
+  // ========================================
+// MONTH
+// ========================================
+
+CURRENTMTD:
+    result.recordsets[5]?.[0]?.CurrentMTD ?? 0,
+
+LASTMTD:
+    result.recordsets[5]?.[0]?.LastMTD ?? 0,
+
+MTDGROWTHPERCENT:
+    result.recordsets[5]?.[0]?.MTDGrowthPercent ?? 0,
+
+
+// ========================================
+// QUARTER
+// ========================================
+
+CURRENTQTD:
+    result.recordsets[5]?.[0]?.CurrentQTD ?? 0,
+
+LASTQTD:
+    result.recordsets[5]?.[0]?.LastQTD ?? 0,
+
+QTDGROWTHPERCENT:
+    result.recordsets[5]?.[0]?.QTDGrowthPercent ?? 0,
+
+QUARTERNO:
+    result.recordsets[5]?.[0]?.QuarterNo ?? 0,
+
+CURRENTQUARTERSTART:
+    result.recordsets[5]?.[0]?.CurrentQuarterStart ?? null,
+
+CURRENTQUARTEREND:
+    result.recordsets[5]?.[0]?.CurrentQuarterEnd ?? null,
+
+PREVIOUSQUARTERSTART:
+    result.recordsets[5]?.[0]?.PreviousQuarterStart ?? null,
+
+PREVIOUSQUARTEREND:
+    result.recordsets[5]?.[0]?.PreviousQuarterEnd ?? null,
+
+
+// ========================================
+// FINANCIAL YEAR
+// ========================================
+
+CURRENTYTD:
+    result.recordsets[5]?.[0]?.CurrentYTD ?? 0,
+
+LASTYTD:
+    result.recordsets[5]?.[0]?.LastYTD ?? 0,
+
+YTDGROWTHPERCENT:
+    result.recordsets[5]?.[0]?.YTDGrowthPercent ?? 0,
 
   MONTHLYTREND:
       result.recordsets[4] ?? [],
