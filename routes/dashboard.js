@@ -1,4 +1,8 @@
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
+
+const sql = require("mssql");
+const { getPool } = require("../config/db");
 router.post("/top-growing-products", async (req, res) => {
 
   const { databaseName, userId } = req.body;

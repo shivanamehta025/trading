@@ -963,8 +963,6 @@ app.get("/api/test", (req, res) => {
   });
 });
 
-
-
 app.post("/api/save-device-token", async (req, res) => {
 
   try {
@@ -1494,7 +1492,6 @@ app.post("/api/get-chat", async (req, res) => {
     });
   }
 });
-
 
 app.post("/api/create-srl-notification", async (req, res) => {
   console.log("BODY RECEIVED");
@@ -2650,6 +2647,9 @@ app.post('/api/category-best-month-customers',
 const dashboardRoutes =
 require("./routes/dashboard");
 app.use("/api", dashboardRoutes);
+
+
+
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
