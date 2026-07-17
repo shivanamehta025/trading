@@ -2375,36 +2375,7 @@ app.post('/api/customer-health', async (req, res) => {
 
 });
 
-app.post('/api/customer-health-details', async (req, res) => {
 
-  try {
-
-    const { databaseName, userId, type } = req.body;
-
-    const pool = await getPool(databaseName);
-
-    const result = await pool.request()
-
-      .input('WHAT', sql.NVarChar(100), 'CUSTOMER_HEALTH_DETAILS')
-      .input('USERID', sql.NVarChar(100), userId)
-      .input('TYPE', sql.NVarChar(50), type)
-
-      .execute('A_SP_FOR_DASHBOARD_APP');
-
-    res.json(result.recordset);
-
-  } catch (err) {
-
-    console.error(err);
-
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-
-  }
-
-});
 
 app.post('/api/category-decline', async (req, res) => {
 
