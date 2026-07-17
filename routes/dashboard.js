@@ -34,6 +34,7 @@ router.post("/top-growing-products", async (req, res) => {
 router.post('/customer-health-details', async (req, res) => {
 
   try {
+    console.log("Customer Health Route Hit");
 
     const { databaseName, userId, type } = req.body;
 
