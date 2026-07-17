@@ -31,7 +31,7 @@ router.post("/top-growing-products", async (req, res) => {
 
 });
 
-router.post('/api/customer-health-details', async (req, res) => {
+router.post('/customer-health-details', async (req, res) => {
 
   try {
 
