@@ -233,5 +233,36 @@ router.post("/top-growing-customers", async (req, res) => {
 
 });
 
+router.post("/top-growing-customer-products", async (req, res) => {
+
+    const { databaseName, userId, customerId } = req.body;
+
+    try {
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+
+            .input("WHAT", sql.VarChar, "TOP_GROWING_CUSTOMER_PRODUCTS")
+
+            .input("SALESPERSON", sql.VarChar, userId)
+
+            .input("CUSTOMERID", sql.VarChar, customerId)
+
+            .execute("A_SP_FOR_DASHBOARD_APP");
+
+        res.json(result.recordset);
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            error: err.message
+        });
+
+    }
+
+});
 
 module.exports = router;
