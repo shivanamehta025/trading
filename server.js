@@ -2472,6 +2472,82 @@ require("./routes/dashboard");
 app.use("/api", dashboardRoutes);
 
 
+//////added by garima
+app.post('/api/enquiry-bind-dropdown', async (req, res) => {
+
+    try {
+
+        const {
+            databaseName
+        } = req.body;
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+
+            .input('what', sql.NVarChar(50), 'binddropdown')
+
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+
+            success: true,
+
+            customer: result.recordsets[0],
+
+            product: result.recordsets[1],
+
+            manufacturer: result.recordsets[2],
+
+            remark: result.recordsets[3],
+
+            enquiryType: result.recordsets[4],
+
+            city: result.recordsets[5]
+
+        });
+
+    }
+
+    catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+
+            success: false,
+
+            message: err.message
+
+        });
+
+    }
+
+});
+
+app.post('/api/enquiry-add-customer', async (req, res) => {
+    try {
+        const { databaseName, name, city, mobile } = req.body;
+        const pool = await getPool(databaseName);
+ 
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'customername')
+            .input('cname', sql.NVarChar(50), name)
+            .input('city', sql.NVarChar(50), city)
+            .input('mobno', sql.NVarChar(50), mobile)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+ 
+ 
+        const unqid = result.recordset?.[0]?.unqid;
+ 
+        res.json({ success: true, unqid });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+
 
 // ─────────────────────────────────────────────────────
 // START SERVER
