@@ -245,7 +245,7 @@ router.post("/top-growing-customer-products", async (req, res) => {
 
             .input("WHAT", sql.VarChar, "TOP_GROWING_CUSTOMER_PRODUCTS")
 
-            .input("SALESPERSON", sql.VarChar, userId)
+            .input("USERID", sql.VarChar, userId)
 
             .input("CUSTOMERID", sql.VarChar, customerId)
 
