@@ -50,8 +50,7 @@ app.post('/api/login', async (req, res) => {
             .input('password', sql.VarChar, password)
 
             .query(`
-                SELECT *
-                FROM SM63
+                select * from sm63 inner join sm61 on sm61.unqid=sm63_8
                 WHERE SM63_5 = @userId
                 AND SM63_7 = @password
             `);
