@@ -338,4 +338,40 @@ router.post("/customer-product-trend", async (req, res) => {
 
 });
 
+router.post("/product-customer-analysis", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName,
+      userId,
+      productId,
+    } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+
+      .input("WHAT", sql.VarChar(100), "PRODUCT_CUSTOMER_ANALYSIS")
+
+      .input("USERID", sql.VarChar(50), userId)
+
+      .input("PRODUCTID", sql.VarChar(50), productId)
+
+      .execute("A_SP_FOR_DASHBOARD_APP");
+
+    res.json(result.recordset);
+
+  } catch (err) {
+
+    console.error("PRODUCT CUSTOMER ANALYSIS :", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+
+  }
+
+});
 module.exports = router;
