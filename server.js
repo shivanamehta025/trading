@@ -2238,7 +2238,7 @@ app.post('/api/category-decline', async (req, res) => {
 
     const result = await pool.request()
 
-      .input('WHAT', sql.NVarChar(100), 'CATEGORY_DECLINE')
+      .input('WHAT', sql.NVarChar(100), 'PRODUCT_DECLINE')
       .input('USERID', sql.NVarChar(100), userId)
 
       .execute('A_SP_FOR_DASHBOARD_APP');
@@ -2375,7 +2375,7 @@ app.post('/api/category-best-month-customers',
       const {
         databaseName,
         userId,
-        categoryId,
+        productId,
         year,
         month,
       } = req.body;
@@ -2395,7 +2395,7 @@ app.post('/api/category-best-month-customers',
 
       
 
-      if (!categoryId) {
+      if (!productId) {
         return res.status(400).json({
           success: false,
           message: "categoryName is required",
@@ -2417,13 +2417,13 @@ app.post('/api/category-best-month-customers',
         .input(
           "WHAT",
           sql.VarChar,
-          "CATEGORY_BEST_MONTH_CUSTOMERS"
+          "PRODUCT_BEST_MONTH_CUSTOMERS"
         )
 
          .input('USERID', sql.NVarChar(100), userId)
 
         .input(
-          "CATEGORYID",
+          "PRODUCTID",
           sql.VarChar,
           categoryId
         )
