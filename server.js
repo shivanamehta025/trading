@@ -2472,6 +2472,7 @@ app.use("/api", dashboardRoutes);
 
 
 //////added by garima
+
 app.post('/api/enquiry-bind-dropdown', async (req, res) => {
 
     try {
@@ -2502,7 +2503,9 @@ app.post('/api/enquiry-bind-dropdown', async (req, res) => {
 
             enquiryType: result.recordsets[4],
 
-            city: result.recordsets[5]
+            city: result.recordsets[5],
+
+            enquiryno: result.recordsets[6]
 
         });
 
@@ -2526,17 +2529,16 @@ app.post('/api/enquiry-bind-dropdown', async (req, res) => {
 
 app.post('/api/enquiry-add-customer', async (req, res) => {
     try {
-        const { databaseName, name, city, mobile } = req.body;
+        const { databaseName, userid, name, city, mobile } = req.body;
         const pool = await getPool(databaseName);
  
         const result = await pool.request()
             .input('what', sql.NVarChar(50), 'customername')
+            .input('userid', sql.NVarChar(50), userid)
             .input('cname', sql.NVarChar(50), name)
             .input('city', sql.NVarChar(50), city)
             .input('mobno', sql.NVarChar(50), mobile)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
- 
- 
         const unqid = result.recordset?.[0]?.unqid;
  
         res.json({ success: true, unqid });
@@ -2546,6 +2548,158 @@ app.post('/api/enquiry-add-customer', async (req, res) => {
     }
 });
 
+app.post('/api/enquiry-bind-mf', async (req, res) => {
+
+  try {
+
+      const {
+          databaseName, prounq
+      } = req.body;
+
+      const pool = await getPool(databaseName);
+
+      const result = await pool.request()
+          .input('what', sql.NVarChar(50), 'bindmf')
+          .input('prounq', sql.NVarChar(50), prounq)
+          .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+      res.json({
+          success: true,
+          manufacturer: result.recordsets[1]
+      });
+
+  }
+
+  catch (err) {
+
+      console.error(err);
+
+      res.status(500).json({
+
+          success: false,
+
+          message: err.message
+
+      });
+
+  }
+
+});
+
+app.post('/api/enquiry-save', async (req, res) => {
+    try {
+        const {
+            databaseName,
+            e_3, e_4, e_6, intime, e_8, outtime,
+            e_10, e_11, e_12, e_13, unq,
+        } = req.body;
+ 
+        const pool = await getPool(databaseName);
+ 
+        const parentResult = await pool.request()
+            .input('what', sql.NVarChar(50), 'save')
+            .input('e_3', sql.NVarChar(50), e_3)
+            .input('e_4', sql.NVarChar(50), e_4)
+            .input('e_6', sql.NVarChar(50), e_6)
+            .input('intime', sql.NVarChar(50), intime)
+            .input('e_8', sql.NVarChar(50), e_8)
+            .input('outtime', sql.NVarChar(50), outtime)
+            .input('e_10', sql.NVarChar(50), e_10)
+            .input('e_11', sql.NVarChar(20), e_11)
+            .input('e_12', sql.NVarChar(50), e_12)
+            .input('e_13', sql.NVarChar(50), e_13)
+            .input('unq', sql.NVarChar(50), unq)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+ 
+        const parentUnq = parentResult.recordset?.[0]?.unq;
+
+        for (const p of (products || [])) {
+            await pool.request()
+                .input('what', sql.NVarChar(50), 'savechild')
+                .input('e_3', sql.NVarChar(50), e_3)
+                .input('e_4', sql.NVarChar(50), e_4)
+                .input('e_c6', sql.NVarChar(50), parentUnq)
+                .input('e_c7', sql.VarChar(10), p.e_c7)
+                .input('e_c8', sql.NVarChar(50), p.e_c8)
+                .input('e_c9', sql.VarChar(10), p.e_c9)
+                .input('e_c10', sql.NVarChar(50), p.e_c10)
+                .input('e_c11', sql.NVarChar(50), p.e_c11)
+                .input('e_c12', sql.NVarChar(sql.MAX), p.e_c12)
+                .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+        }
+ 
+        res.json({ success: true, unq: parentUnq });
+ 
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post("/api/create-enquiry-notification", async (req, res) => {
+  try {
+ 
+    const {
+      databaseName,
+      referenceId,
+      targetUser,
+      title,
+      message
+    } = req.body;
+ 
+    const pool = await getPool(databaseName);
+    const companyPool = await getPool();
+ 
+    await pool.request()
+      .input("USERID", sql.VarChar, targetUser)
+      .input("TITLE", sql.VarChar, title)
+      .input("MESSAGE", sql.NVarChar, message)
+      .input("REFERENCEID", sql.VarChar, referenceId)
+      .input("DATABASENAME", sql.VarChar, databaseName)
+      .query(`
+        INSERT INTO APP_NOTIFICATION
+        (
+          USERID,
+          TITLE,
+          MESSAGE,
+          REFERENCEID,
+          DATABASENAME,
+          ISREAD,
+          CREATEDON
+        )
+        VALUES
+        (
+          @USERID,
+          @TITLE,
+          @MESSAGE,
+          @REFERENCEID,
+          @DATABASENAME,
+          0,
+          GETDATE()
+        )
+      `);
+ 
+ 
+    const tokenResult = await companyPool.request()
+      .input("userId", sql.VarChar, targetUser)
+      .query(`
+        SELECT DEVICETOKEN
+        FROM APP_DEVICE_TOKEN
+        WHERE USERID = @userId
+      `);
+ 
+    if (tokenResult.recordset.length > 0) {
+      const token = tokenResult.recordset[0].DEVICETOKEN;
+      await sendNotification(token, title, message);
+    }
+ 
+    res.json({ success: true });
+ 
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 
 // ─────────────────────────────────────────────────────
