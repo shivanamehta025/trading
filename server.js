@@ -2425,7 +2425,7 @@ app.post('/api/category-best-month-customers',
         .input(
           "PRODUCTID",
           sql.VarChar,
-          categoryId
+          productId
         )
 
         .input(
