@@ -265,4 +265,77 @@ router.post("/top-growing-customer-products", async (req, res) => {
 
 });
 
+router.post("/product-customer-insight", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      userId,
+      customerId,
+      productId,
+      bestMonthYear,
+      bestMonthNo,
+    } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+      .input("WHAT", sql.VarChar(100), "PRODUCT_CUSTOMER_INSIGHT")
+      .input("USERID", sql.VarChar(50), userId)
+      .input("CUSTOMERID", sql.VarChar(50), customerId)
+      .input("PRODUCTID", sql.VarChar(50), productId)
+      .input("BESTMONTHYEAR", sql.Int, bestMonthYear)
+      .input("BESTMONTHNO", sql.Int, bestMonthNo)
+      .execute("A_SP_FOR_DASHBOARD_APP");
+
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("PRODUCT CUSTOMER INSIGHT ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+router.post("/customer-product-trend", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName,
+      userId,
+      customerId,
+      productId,
+    } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+
+      .input("WHAT", sql.VarChar(100), "PRODUCT_CUSTOMER_MONTHLY_TREND")
+
+      .input("USERID", sql.VarChar(50), userId)
+
+      .input("CUSTOMERID", sql.VarChar(50), customerId)
+
+      .input("PRODUCTID", sql.VarChar(50), productId)
+
+      .execute("A_SP_FOR_DASHBOARD_APP");
+
+    res.json(result.recordset);
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      message: err.message,
+    });
+
+  }
+
+});
+
 module.exports = router;
