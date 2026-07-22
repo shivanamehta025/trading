@@ -2565,7 +2565,8 @@ app.post('/api/enquiry-bind-mf', async (req, res) => {
 
       res.json({
           success: true,
-          manufacturer: result.recordsets[1]
+          manufacturerVisit: result.recordsets[0],
+          manufacturerRate: result.recordsets[1]
       });
 
   }
@@ -2591,7 +2592,7 @@ app.post('/api/enquiry-save', async (req, res) => {
         const {
             databaseName,
             e_3, e_4, e_6, intime, e_8, outtime,
-            e_10, e_11, e_12, e_13, unq,
+            e_10, e_11, e_12, e_13, unq, products
         } = req.body;
  
         const pool = await getPool(databaseName);
@@ -2630,11 +2631,13 @@ app.post('/api/enquiry-save', async (req, res) => {
  
         res.json({ success: true, unq: parentUnq });
  
-    } catch (err) {
+    } 
+    catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
+
 
 app.post("/api/create-enquiry-notification", async (req, res) => {
   try {
