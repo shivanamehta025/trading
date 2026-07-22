@@ -314,7 +314,7 @@ router.post("/customer-product-trend", async (req, res) => {
 
     const result = await pool.request()
 
-      .input("WHAT", sql.VarChar(100), "PRODUCT_CUSTOMER_MONTHLY_TREND")
+      .input("WHAT", sql.VarChar(100), "PRODUCT_CUSTOMER_MONTHLY_TREND_LASTFY")
 
       .input("USERID", sql.VarChar(50), userId)
 
