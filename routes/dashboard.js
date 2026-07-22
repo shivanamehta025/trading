@@ -288,7 +288,9 @@ router.post("/product-customer-insight", async (req, res) => {
       .input("BESTMONTHNO", sql.Int, bestMonthNo)
       .execute("A_SP_FOR_DASHBOARD_APP");
 
-    res.json(result.recordset);
+    console.log(result.recordsets);
+
+    res.json(result.recordsets);
   } catch (err) {
     console.error("PRODUCT CUSTOMER INSIGHT ERROR:", err);
 
@@ -324,8 +326,7 @@ router.post("/customer-product-trend", async (req, res) => {
 
       .execute("A_SP_FOR_DASHBOARD_APP");
 
-console.log(result.recordsets);
-res.json(result.recordsets);
+    res.json(result.recordset);
 
   } catch (err) {
 
