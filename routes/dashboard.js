@@ -324,10 +324,8 @@ router.post("/customer-product-trend", async (req, res) => {
 
       .execute("A_SP_FOR_DASHBOARD_APP");
 
-  res.json({
-    insight: result.recordsets[0],
-    productList: result.recordsets[1]
-});
+console.log(result.recordsets);
+res.json(result.recordsets);
 
   } catch (err) {
 
