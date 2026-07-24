@@ -310,14 +310,14 @@ router.post("/customer-product-trend", async (req, res) => {
       userId,
       customerId,
       productId,
-       what,      
+      what,              // <-- Add this
     } = req.body;
 
     const pool = await getPool(databaseName);
 
     const result = await pool.request()
 
-      .input("WHAT", sql.VarChar(100), "PRODUCT_CUSTOMER_MONTHLY_TREND_LASTFY")
+      .input("WHAT", sql.VarChar(100), what)   // <-- Use request value
 
       .input("USERID", sql.VarChar(50), userId)
 
