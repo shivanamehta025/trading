@@ -310,6 +310,7 @@ router.post("/customer-product-trend", async (req, res) => {
       userId,
       customerId,
       productId,
+       what,      
     } = req.body;
 
     const pool = await getPool(databaseName);
