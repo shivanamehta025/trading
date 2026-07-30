@@ -45,31 +45,47 @@ app.post('/api/login', async (req, res) => {
         const pool = await getPool();
 
         const result = await pool.request()
-
             .input('userId', sql.VarChar, userId)
             .input('password', sql.VarChar, password)
-
             .query(`
-                select * from sm63 inner join sm61 on sm61.unqid=sm63_8
+                SELECT *
+                FROM SM63
+                INNER JOIN SM61
+                    ON SM61.UNQID = SM63_8
                 WHERE SM63_5 = @userId
-                AND SM63_7 = @password
+                  AND SM63_7 = @password
             `);
 
-        if (result.recordset.length > 0) {
+        if (result.recordset.length === 0) {
 
-            return res.json({
-
-                success: true,
-
-                user: result.recordset[0]
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid UserID or Password'
             });
+
         }
 
-        return res.status(401).json({
+        // First row contains common user information
+        const firstRow = result.recordset[0];
 
-            success: false,
+        // Build company list
+        const companies = result.recordset.map(row => ({
+            companyCode: row.SM63_14,
+            databaseName: row.SM63_15,
+        }));
 
-            message: 'Invalid UserID or Password'
+        return res.json({
+
+            success: true,
+
+            user: {
+                sm63_5: firstRow.SM63_5,
+                sm63_6: firstRow.sm63_6,
+                sm61_6: firstRow.sm61_6,
+            },
+
+            companies: companies,
+
         });
 
     } catch (err) {
@@ -77,11 +93,12 @@ app.post('/api/login', async (req, res) => {
         console.log(err);
 
         res.status(500).json({
-
             success: false,
             message: err.message
         });
+
     }
+
 });
 
 app.post("/api/branches", async (req, res) => {
@@ -2647,7 +2664,8 @@ app.post("/api/create-enquiry-notification", async (req, res) => {
       referenceId,
       targetUser,
       title,
-      message
+      message,
+      documenttype,
     } = req.body;
  
     const pool = await getPool(databaseName);
@@ -2659,6 +2677,7 @@ app.post("/api/create-enquiry-notification", async (req, res) => {
       .input("MESSAGE", sql.NVarChar, message)
       .input("REFERENCEID", sql.VarChar, referenceId)
       .input("DATABASENAME", sql.VarChar, databaseName)
+      .input("DOCUMENTTYPE", sql.VarChar, documenttype || "")
       .query(`
         INSERT INTO APP_NOTIFICATION
         (
@@ -2668,7 +2687,8 @@ app.post("/api/create-enquiry-notification", async (req, res) => {
           REFERENCEID,
           DATABASENAME,
           ISREAD,
-          CREATEDON
+          CREATEDON,
+          DOCUMENTTYPE
         )
         VALUES
         (
@@ -2678,7 +2698,8 @@ app.post("/api/create-enquiry-notification", async (req, res) => {
           @REFERENCEID,
           @DATABASENAME,
           0,
-          GETDATE()
+          GETDATE(),
+          @DOCUMENTTYPE
         )
       `);
  
@@ -2702,6 +2723,112 @@ app.post("/api/create-enquiry-notification", async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: err.message });
   }
+});
+
+app.post('/api/enquiry-bind-data', async (req, res) => {
+    try {
+        const { databaseName, unq } = req.body;
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'BINDDATA')
+            .input('unq', sql.NVarChar(50), unq)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            enquiry: result.recordsets[0][0] || null,
+            products: result.recordsets[1] || []
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/bind-rate', async (req, res) => {
+    try {
+        const { databaseName, enquiryUnq, prounq, qty, formDate } = req.body;
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'bindrate')
+            .input('e_c6', sql.NVarChar(50), enquiryUnq)
+            .input('e_c8', sql.NVarChar(50), prounq)
+            .input('e_c11', sql.Decimal(18, 2), qty)
+            .input('Fdate', sql.NVarChar(50), formDate)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            cash: result.recordsets[0]?.[0]?.cash ?? 0,
+            credit: result.recordsets[1]?.[0]?.credit ?? 0,
+            singlefreightamt: result.recordsets[2]?.[0]?.singlefreightamt ?? 0,
+            margin: result.recordsets[3]?.[0]?.margin ?? 0,
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/enquiry-total-rate', async (req, res) => {
+    try {
+        const { databaseName, cash, credit, single, margin } = req.body;
+        const pool = await getPool(databaseName);
+
+        const marginResult = await pool.request()
+            .input('what', sql.NVarChar(50), 'MarginAmt')
+            .input('CASH', sql.Decimal(18, 2), cash)
+            .input('CREDIT', sql.Decimal(18, 2), credit)
+            .input('SINGLE', sql.Decimal(18, 2), single)
+            .input('MARGIN', sql.Decimal(18, 2), margin)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        const margin1 = marginResult.recordset[0]?.MARGIN1 ?? 0;
+        const margin2 = marginResult.recordset[0]?.MARGIN2 ?? 0;
+
+        const totalResult = await pool.request()
+            .input('what', sql.NVarChar(50), 'Totalrate')
+            .input('CASH', sql.Decimal(18, 2), cash)
+            .input('CREDIT', sql.Decimal(18, 2), credit)
+            .input('SINGLE', sql.Decimal(18, 2), single)
+            .input('margin1', sql.Decimal(18, 2), margin1)
+            .input('margin2', sql.Decimal(18, 2), margin2)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            margin1,
+            margin2,
+            total1: totalResult.recordset[0]?.Total1 ?? 0,
+            total2: totalResult.recordset[0]?.Total2 ?? 0
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/enquiry-save-child-total', async (req, res) => {
+    try {
+        const { databaseName, enquiryUnq, prounq, margin, totcas, totcrs } = req.body;
+        const pool = await getPool(databaseName);
+
+        await pool.request()
+            .input('what', sql.NVarChar(50), 'childtotup')
+            .input('e_c6', sql.NVarChar(50), enquiryUnq)
+            .input('e_c8', sql.NVarChar(50), prounq)
+            .input('e_c13', sql.Decimal(18, 2), margin)
+            .input('e_c14', sql.Decimal(18, 2), totcas)
+            .input('e_c15', sql.Decimal(18, 2), totcrs)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 
