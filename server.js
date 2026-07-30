@@ -79,7 +79,7 @@ app.post('/api/login', async (req, res) => {
             success: true,
 
             user: {
-                sm63_5: firstRow.SM63_5,
+                sm63_5: firstRow.sm63_5,
                 sm63_6: firstRow.sm63_6,
                 sm61_6: firstRow.sm61_6,
             },
