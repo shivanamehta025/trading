@@ -1109,73 +1109,49 @@ app.post("/api/notifications", async (req, res) => {
 
   try {
 
-    const {
-      userId,
-      allowedDatabases
-    } = req.body;
+    const { userId, companies } = req.body;
 
     let allNotifications = [];
 
-    const dbs =
-      allowedDatabases.split(",");
+    for (const company of companies) {
 
-    for (const db of dbs) {
-
-      let databaseName = "";
-
-      if (db.trim() === "TRADING") {
-        databaseName = "Testing";
-      }
-
-      if (db.trim() === "NT") {
-        databaseName =
-          "ac25";
-      }
+      const databaseName = company.databaseName;
 
       if (!databaseName) continue;
 
-      const pool =
-        await getPool(databaseName);
+      const pool = await getPool(databaseName);
 
-      const result =
-        await pool.request()
+      const result = await pool.request()
 
-          .input(
-            "userId",
-            sql.VarChar,
-            userId
-          )
+        .input("userId", sql.VarChar, userId)
 
-          .query(`
-            SELECT
- ID,
- USERID,
- TITLE,
- MESSAGE,
- FROMUSER,
-DOCUMENTTYPE,
- ISREAD,
- CREATEDON,
- REFERENCEID,
- DATABASENAME
-FROM APP_NOTIFICATION
-            WHERE USERID=@userId
-          `);
+        .query(`
+          SELECT
+              ID,
+              USERID,
+              TITLE,
+              MESSAGE,
+              FROMUSER,
+              DOCUMENTTYPE,
+              ISREAD,
+              CREATEDON,
+              REFERENCEID,
+              DATABASENAME
+          FROM APP_NOTIFICATION
+          WHERE USERID = @userId
+        `);
 
-      allNotifications.push(
-        ...result.recordset
-      );
+      allNotifications.push(...result.recordset);
     }
 
     allNotifications.sort(
       (a, b) =>
-        new Date(b.CREATEDON) -
-        new Date(a.CREATEDON)
+        new Date(b.CREATEDON) - new Date(a.CREATEDON)
     );
 
     res.json({
       success: true,
-      data: allNotifications
+      data: allNotifications,
     });
 
   } catch (err) {
@@ -1184,11 +1160,12 @@ FROM APP_NOTIFICATION
 
     res.status(500).json({
       success: false,
-      message: err.message
+      message: err.message,
     });
-  }
-});
 
+  }
+
+});
 app.post("/api/read-notification", async (req, res) => {
 
   try {
@@ -1236,49 +1213,35 @@ app.post("/api/notification-count", async (req, res) => {
 
     const {
       userId,
-      allowedDatabases
+      companies
     } = req.body;
 
     let totalCount = 0;
 
-    const dbMap = {
-      TRADING: "Testing",
-      NT: "ac25"
-    };
+    for (const company of companies) {
 
-    const databases =
-      allowedDatabases.split(",");
+      const databaseName = company.databaseName;
 
-    for (const db of databases) {
+      if (!databaseName) continue;
 
-      const actualDb =
-        dbMap[db.trim().toUpperCase()];
+      const pool = await getPool(databaseName);
 
-      if (!actualDb) {
-        continue;
-      }
+      const result = await pool.request()
 
-      const pool =
-        await getPool(actualDb);
+        .input(
+          "userId",
+          sql.VarChar,
+          userId
+        )
 
-      const result =
-        await pool.request()
+        .query(`
+          SELECT COUNT(*) AS CNT
+          FROM APP_NOTIFICATION
+          WHERE USERID = @userId
+            AND ISREAD = 0
+        `);
 
-          .input(
-            "userId",
-            sql.VarChar,
-            userId
-          )
-
-          .query(`
-            SELECT COUNT(*) AS CNT
-            FROM APP_NOTIFICATION
-            WHERE USERID = @userId
-              AND ISREAD = 0
-          `);
-
-      totalCount +=
-        result.recordset[0].CNT;
+      totalCount += result.recordset[0]?.CNT ?? 0;
     }
 
     res.json({
@@ -1288,17 +1251,16 @@ app.post("/api/notification-count", async (req, res) => {
 
   } catch (err) {
 
-    console.log(
-      "NOTIFICATION COUNT ERROR"
-    );
-
+    console.log("NOTIFICATION COUNT ERROR");
     console.log(err);
 
     res.status(500).json({
       success: false,
       message: err.message
     });
+
   }
+
 });
 
 app.post("/api/send-chat", async (req, res) => {
