@@ -5,6 +5,8 @@ const pools = {};
 
 async function getPool(databaseName) {
 
+  console.log("Connecting to:", databaseName);
+
   const dbName =
     databaseName ||
     process.env.DB_NAME ||

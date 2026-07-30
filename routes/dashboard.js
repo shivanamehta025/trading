@@ -12,6 +12,8 @@ router.post("/sales-dashboard", async (req, res) => {
       userId
     } = req.body;
 
+    console.log("DATABASE RECEIVED =", databaseName);
+
     const pool =
       await getPool(databaseName);
 
