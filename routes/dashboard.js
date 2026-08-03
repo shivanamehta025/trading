@@ -379,4 +379,33 @@ router.post("/product-customer-analysis", async (req, res) => {
   }
 
 });
+
+router.post("/customer-risk-score", async (req, res) => {
+  try {
+
+    const { databaseName, customerId } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input("WHAT", sql.VarChar, "CUSTOMER_RISK_SCORE")
+      .input("CustomerID", sql.VarChar, customerId)
+      .execute("A_SP_FOR_SRL_APP");
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+
+  }
+});
 module.exports = router;
