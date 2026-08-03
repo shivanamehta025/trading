@@ -408,4 +408,39 @@ router.post("/customer-risk-score", async (req, res) => {
 
   }
 });
+
+router.post("/customer-due-bills", async (req, res) => {
+    try {
+
+        const { databaseName, customerId } = req.body;
+
+        if (!databaseName || !customerId) {
+            return res.status(400).json({
+                success: false,
+                message: "databaseName and customerId are required."
+            });
+        }
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input("WHAT", sql.VarChar, "CUSTOMER_DUE_BILLS")
+            .input("CustomerID", sql.VarChar, customerId)
+            .execute("A_SP_FOR_SRL_APP");
+
+        res.json({
+            success: true,
+            data: result.recordset
+        });
+
+    } catch (err) {
+
+        console.error("Customer Due Bills Error:", err);
+
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
 module.exports = router;
