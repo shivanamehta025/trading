@@ -2449,6 +2449,10 @@ const dashboardRoutes =
 require("./routes/dashboard");
 app.use("/api", dashboardRoutes);
 
+const ai_assistant =
+require("./routes/ai_assistant");
+app.use("/api", ai_assistant);
+
 
 //////added by garima
 
