@@ -6,7 +6,25 @@ const { getPool } = require("../config/db");
 router.post("/ai-assistant", async (req, res) => {
     try {
 
-        const { databaseName, what } = req.body;
+        const { databaseName, message } = req.body;
+
+        let what = "";
+
+        const text = message.toLowerCase();
+
+        if (
+            text.includes("today") &&
+            text.includes("sale")
+        ) {
+            what = "TODAY_SALES";
+        }
+
+        else {
+            return res.json({
+                success: false,
+                message: "Sorry, I don't understand this question yet."
+            });
+        }
 
         const pool = await getPool(databaseName);
 
@@ -16,6 +34,7 @@ router.post("/ai-assistant", async (req, res) => {
 
         res.json({
             success: true,
+            intent: what,
             data: result.recordset[0]
         });
 
