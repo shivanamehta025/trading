@@ -2624,67 +2624,39 @@ app.post('/api/enquiry-save', async (req, res) => {
 
 app.post("/api/create-enquiry-notification", async (req, res) => {
   try {
- 
-    const {
-      databaseName,
-      referenceId,
-      targetUser,
-      title,
-      message,
-      documenttype,
-    } = req.body;
- 
+    const { databaseName, referenceId, targetUser, title, message, documenttype, fromUser } = req.body;
+
     const pool = await getPool(databaseName);
     const companyPool = await getPool();
- 
-    await pool.request()
-      .input("USERID", sql.VarChar, targetUser)
-      .input("TITLE", sql.VarChar, title)
-      .input("MESSAGE", sql.NVarChar, message)
-      .input("REFERENCEID", sql.VarChar, referenceId)
-      .input("DATABASENAME", sql.VarChar, databaseName)
-      .input("DOCUMENTTYPE", sql.VarChar, documenttype || "")
-      .query(`
-        INSERT INTO APP_NOTIFICATION
-        (
-          USERID,
-          TITLE,
-          MESSAGE,
-          REFERENCEID,
-          DATABASENAME,
-          ISREAD,
-          CREATEDON,
-          DOCUMENTTYPE
-        )
-        VALUES
-        (
-          @USERID,
-          @TITLE,
-          @MESSAGE,
-          @REFERENCEID,
-          @DATABASENAME,
-          0,
-          GETDATE(),
-          @DOCUMENTTYPE
-        )
-      `);
- 
- 
-    const tokenResult = await companyPool.request()
-      .input("userId", sql.VarChar, targetUser)
-      .query(`
-        SELECT DEVICETOKEN
-        FROM APP_DEVICE_TOKEN
-        WHERE USERID = @userId
-      `);
- 
-    if (tokenResult.recordset.length > 0) {
-      const token = tokenResult.recordset[0].DEVICETOKEN;
-      await sendNotification(token, title, message);
+
+    const userIds = (targetUser || '').split(',').map(u => u.trim()).filter(Boolean);
+
+    for (const uid of userIds) {
+      await pool.request()
+        .input("USERID", sql.VarChar, uid)
+        .input("TITLE", sql.VarChar, title)
+        .input("MESSAGE", sql.NVarChar, message)
+        .input("REFERENCEID", sql.VarChar, referenceId)
+        .input("DATABASENAME", sql.VarChar, databaseName)
+        .input("DOCUMENTTYPE", sql.VarChar, documenttype || "")
+        .input("FROMUSER", sql.VarChar, fromUser || "")
+        .query(`
+          INSERT INTO APP_NOTIFICATION
+          (USERID, TITLE, MESSAGE, REFERENCEID, DATABASENAME, ISREAD, CREATEDON, DOCUMENTTYPE, FROMUSER)
+          VALUES
+          (@USERID, @TITLE, @MESSAGE, @REFERENCEID, @DATABASENAME, 0, GETDATE(), @DOCUMENTTYPE, @FROMUSER)
+        `);
+
+      const tokenResult = await companyPool.request()
+        .input("userId", sql.VarChar, uid)
+        .query(`SELECT DEVICETOKEN FROM APP_DEVICE_TOKEN WHERE USERID = @userId`);
+
+      if (tokenResult.recordset.length > 0) {
+        await sendNotification(tokenResult.recordset[0].DEVICETOKEN, title, message);
+      }
     }
- 
+
     res.json({ success: true });
- 
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: err.message });
@@ -2817,6 +2789,45 @@ app.post('/api/enquiry-rem-stock', async (req, res) => {
     }
 });
 
+app.post('/api/get-notify-targets', async (req, res) => {
+    try {
+        const { databaseName, keytype } = req.body;
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'gettargetusers')
+            .input('keytype', sql.NVarChar(100), keytype)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            targetUser: result.recordset[0]?.USERID ?? ''
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/enquiry-admin-rate-save', async (req, res) => {
+    try {
+        const { databaseName, unq, prounq, cash, credit } = req.body;
+        const pool = await getPool(databaseName);
+
+        await pool.request()
+            .input('what', sql.NVarChar(50), 'adminratesave')
+            .input('unq', sql.NVarChar(50), unq)
+            .input('prounq', sql.NVarChar(50), prounq)
+            .input('cash', sql.Decimal(18, 2), cash)
+            .input('credit', sql.Decimal(18, 2), credit)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
 
 // ─────────────────────────────────────────────────────
 // START SERVER
