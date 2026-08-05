@@ -32,12 +32,13 @@ router.post("/ai-assistant", async (req, res) => {
             .input("WHAT", sql.NVarChar(100), what)
             .execute("A_SP_FOR_AI_ASSISTANT");
 
-        res.json({
-            success: true,
-            intent: what,
-            data: result.recordset[0]
-        });
+      const summary = await generateSalesSummary(result.recordset[0]);
 
+res.json({
+    success: true,
+    answer: summary,
+    rawData: result.recordset[0]
+});
     } catch (err) {
 
         console.error(err);
