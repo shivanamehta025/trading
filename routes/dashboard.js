@@ -455,11 +455,17 @@ router.post("/customer-due-bills_dashboard", async (req, res) => {
       .input("CUSTOMERUNQ", sql.VarChar, customerUnq)
       .execute("A_SP_FOR_DASHBOARD_APP");
 
-    res.json(result.recordset);
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
 module.exports = router;
