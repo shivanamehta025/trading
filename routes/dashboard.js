@@ -443,4 +443,23 @@ router.post("/customer-due-bills", async (req, res) => {
         });
     }
 });
+
+router.post("/customer-due-bills_dashboard", async (req, res) => {
+  try {
+    const { databaseName, customerUnq } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input("WHAT", sql.VarChar, "CUSTOMER_DUE_BILLS")
+      .input("CUSTOMERUNQ", sql.VarChar, customerUnq)
+      .execute("A_SP_FOR_DASHBOARD_APP");
+
+    res.json(result.recordset);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 module.exports = router;
