@@ -2453,6 +2453,11 @@ const ai_assistant =
 require("./routes/ai_assistant");
 app.use("/api", ai_assistant);
 
+const admin_dashboard =
+require("./routes/admin_dashboard");
+app.use("/api", admin_dashboard);
+
+
 
 //////added by garima
 
