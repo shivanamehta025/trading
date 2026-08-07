@@ -2580,7 +2580,7 @@ app.post('/api/enquiry-save', async (req, res) => {
         const {
             databaseName,
             e_3, e_4, e_6, intime, e_8, outtime,
-            e_10, e_11, e_12, e_13, unq, products
+            e_10, e_11, e_12, e_13, e_14, e_15, unq, products
         } = req.body;
  
         const pool = await getPool(databaseName);
@@ -2597,11 +2597,13 @@ app.post('/api/enquiry-save', async (req, res) => {
             .input('e_11', sql.NVarChar(20), e_11)
             .input('e_12', sql.NVarChar(50), e_12)
             .input('e_13', sql.NVarChar(50), e_13)
+            .input('e_14', sql.NVarChar(sql.MAX), e_14)
+            .input('e_15', sql.NVarChar(sql.MAX), e_15)
             .input('unq', sql.NVarChar(50), unq)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
  
         const parentUnq = parentResult.recordset?.[0]?.unq;
-
+ 
         for (const p of (products || [])) {
             await pool.request()
                 .input('what', sql.NVarChar(50), 'savechild')
@@ -2619,14 +2621,11 @@ app.post('/api/enquiry-save', async (req, res) => {
  
         res.json({ success: true, unq: parentUnq });
  
-    } 
-    catch (err) {
+    } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
-
-
 app.post("/api/create-enquiry-notification", async (req, res) => {
   try {
     const { databaseName, referenceId, targetUser, title, message, documenttype, fromUser } = req.body;
