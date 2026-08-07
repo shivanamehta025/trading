@@ -13,7 +13,7 @@ router.post("/director-dashboard", async (req, res) => {
 
         const result = await pool.request()
             .input("WHAT", sql.VarChar, "DIRECTOR_DASHBOARD")
-            .execute("A_SP_FOR_DIRECTOR_DASHBOARD");
+            .execute("A_SP_FOR_DASHBOARD_ADMIN");
 
         res.json(result.recordsets);
 
