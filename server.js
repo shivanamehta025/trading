@@ -2616,6 +2616,8 @@ app.post('/api/enquiry-save', async (req, res) => {
                 .input('e_c10', sql.NVarChar(50), p.e_c10)
                 .input('e_c11', sql.NVarChar(50), p.e_c11)
                 .input('e_c12', sql.NVarChar(sql.MAX), p.e_c12)
+                .input('e_c18', sql.NVarChar(sql.MAX), p.e_c18)
+
                 .execute('A_SP_FOR_ENQUIRYMASTER_APP');
         }
  
