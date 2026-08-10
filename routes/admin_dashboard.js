@@ -80,4 +80,55 @@ router.post("/manufacturerwise-purchase", async (req, res) => {
     }
 });
 
+router.post("/product-direct-customers", async (req, res) => {
+    try {
+
+        const {
+            databaseName,
+            productId,
+            period
+        } = req.body;
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+
+            .input(
+                "WHAT",
+                sql.NVarChar(200),
+                "PRODUCT_DIRECT_CUSTOMERS"
+            )
+
+            .input(
+                "PRODUCTID",
+                sql.NVarChar(100),
+                productId
+            )
+
+            .input(
+                "PERIOD",
+                sql.NVarChar(20),
+                period || "CURRENT"
+            )
+
+            .execute(
+                "A_SP_FOR_DASHBOARD_ADMIN"
+            );
+
+        res.json(result.recordset);
+
+    } catch (error) {
+
+        console.error(
+            "Product direct customers error:",
+            error
+        );
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to load direct customers"
+        });
+    }
+});
+
 module.exports = router;
