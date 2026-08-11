@@ -2457,6 +2457,11 @@ const admin_dashboard =
 require("./routes/admin_dashboard");
 app.use("/api", admin_dashboard);
 
+const callservice =
+require("./routes/callservice");
+app.use("/api", callservice);
+
+
 
 
 //////added by garima
