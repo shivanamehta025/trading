@@ -20,7 +20,11 @@ router.post("/save-sales-call", async (req, res) => {
             callStatus,
             callOutcome,
             remarks,
-            nextFollowUpDate
+            nextFollowUpDate,
+            callPurpose,
+            paymentAfterDays,
+            expectedPaymentDate
+
         } = req.body;
 
         const pool = await getPool(databaseName);
@@ -100,6 +104,23 @@ router.post("/save-sales-call", async (req, res) => {
                 sql.Date,
                 nextFollowUpDate
             )
+            .input(
+    "CALLPURPOSE",
+    sql.VarChar(30),
+    callPurpose
+)
+
+.input(
+    "PAYMENTAFTERDAYS",
+    sql.Int,
+    paymentAfterDays
+)
+
+.input(
+    "EXPECTEDPAYMENTDATE",
+    sql.Date,
+    expectedPaymentDate
+)
 
             .execute("A_SP_SALES_CALL");
 
