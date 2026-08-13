@@ -4,7 +4,7 @@ const router = express.Router();
 const sql = require("mssql");
 const { getPool } = require("../config/db");
 
-app.post('/api/enquiry-bind-dropdown', async (req, res) => {
+router.post('/enquiry-bind-dropdown', async (req, res) => {
 
     try {
 
@@ -58,7 +58,7 @@ app.post('/api/enquiry-bind-dropdown', async (req, res) => {
 
 });
 
-app.post('/api/enquiry-add-customer', async (req, res) => {
+router.post('/enquiry-add-customer', async (req, res) => {
     try {
         const { databaseName, userid, name, city, mobile } = req.body;
         const pool = await getPool(databaseName);
@@ -79,7 +79,7 @@ app.post('/api/enquiry-add-customer', async (req, res) => {
     }
 });
 
-app.post('/api/enquiry-bind-mf', async (req, res) => {
+router.post('/enquiry-bind-mf', async (req, res) => {
 
   try {
 
@@ -118,7 +118,7 @@ app.post('/api/enquiry-bind-mf', async (req, res) => {
 
 });
 
-app.post('/api/enquiry-save', async (req, res) => {
+router.post('/enquiry-save', async (req, res) => {
     try {
         const {
             databaseName,
@@ -171,7 +171,7 @@ app.post('/api/enquiry-save', async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 });
-app.post("/api/create-enquiry-notification", async (req, res) => {
+router.post("/create-enquiry-notification", async (req, res) => {
   try {
     const { databaseName, referenceId, targetUser, title, message, documenttype, fromUser } = req.body;
 
@@ -212,7 +212,7 @@ app.post("/api/create-enquiry-notification", async (req, res) => {
   }
 });
 
-app.post('/api/enquiry-bind-data', async (req, res) => {
+router.post('/enquiry-bind-data', async (req, res) => {
     try {
         const { databaseName, unq } = req.body;
         const pool = await getPool(databaseName);
@@ -233,7 +233,7 @@ app.post('/api/enquiry-bind-data', async (req, res) => {
     }
 });
 
-app.post('/api/bind-rate', async (req, res) => {
+router.post('/bind-rate', async (req, res) => {
     try {
         const { databaseName, enquiryUnq, prounq, qty, formDate } = req.body;
         const pool = await getPool(databaseName);
@@ -259,7 +259,7 @@ app.post('/api/bind-rate', async (req, res) => {
     }
 });
 
-app.post('/api/enquiry-total-rate', async (req, res) => {
+router.post('/enquiry-total-rate', async (req, res) => {
     try {
         const { databaseName, cash, credit, single, margin } = req.body;
         const pool = await getPool(databaseName);
@@ -297,7 +297,7 @@ app.post('/api/enquiry-total-rate', async (req, res) => {
     }
 });
 
-app.post('/api/enquiry-save-child-total', async (req, res) => {
+router.post('/enquiry-save-child-total', async (req, res) => {
     try {
         const { databaseName, enquiryUnq, prounq, margin, totcas, totcrs } = req.body;
         const pool = await getPool(databaseName);
@@ -318,7 +318,7 @@ app.post('/api/enquiry-save-child-total', async (req, res) => {
     }
 });
 
-app.post('/api/enquiry-rem-stock', async (req, res) => {
+router.post('/enquiry-rem-stock', async (req, res) => {
     try {
         const { databaseName, unq } = req.body;
         const pool = await getPool(databaseName);
@@ -338,7 +338,7 @@ app.post('/api/enquiry-rem-stock', async (req, res) => {
     }
 });
 
-app.post('/api/get-notify-targets', async (req, res) => {
+router.post('/get-notify-targets', async (req, res) => {
     try {
         const { databaseName, keytype } = req.body;
         const pool = await getPool(databaseName);
@@ -358,7 +358,7 @@ app.post('/api/get-notify-targets', async (req, res) => {
     }
 });
 
-app.post('/api/enquiry-admin-rate-save', async (req, res) => {
+router.post('/enquiry-admin-rate-save', async (req, res) => {
     try {
         const { databaseName, unq, prounq, cash, credit } = req.body;
         const pool = await getPool(databaseName);
@@ -378,7 +378,7 @@ app.post('/api/enquiry-admin-rate-save', async (req, res) => {
     }
 });
 
-app.post('/api/enquiry-in-out-time', async (req, res) => {
+router.post('/enquiry-in-out-time', async (req, res) => {
     try {
         const { databaseName, unq, e_3, intime, outtime, e_8 } = req.body;
         const pool = await getPool(databaseName);
@@ -411,7 +411,7 @@ app.post('/api/enquiry-in-out-time', async (req, res) => {
     }
 });
 
-app.post('/api/enquiry-check-pending-visit', async (req, res) => {
+router.post('/enquiry-check-pending-visit', async (req, res) => {
     try {
         const { databaseName, e_3 } = req.body;
         const pool = await getPool(databaseName);
