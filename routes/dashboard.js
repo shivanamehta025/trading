@@ -468,4 +468,30 @@ router.post("/customer-due-bills_dashboard", async (req, res) => {
     });
   }
 });
+
+router.post("/collection-history", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      userId,
+      customerunq
+    } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input("WHAT", sql.VarChar, "COLLECTION_HISTORY")
+      .input("CUSTOMERUNQ", sql.VarChar, customerunq)
+      .execute("A_SP_FOR_DASHBOARD_APP");
+
+    res.json(result.recordset);
+
+  } catch (error) {
+    console.error("COLLECTION HISTORY ERROR:", error);
+
+    res.status(500).json({
+      error: "Failed to fetch collection history"
+    });
+  }
+});
 module.exports = router;
