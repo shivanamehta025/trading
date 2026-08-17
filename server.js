@@ -2039,7 +2039,7 @@ res.json(result.recordset);
 
 });
 
-app.post("/api/all-users", async (req, res) => {
+/* app.post("/api/all-users", async (req, res) => {
 
   try {
 
@@ -2073,6 +2073,61 @@ app.post("/api/all-users", async (req, res) => {
     res.status(500).json({
       success: false,
       message: err.message
+    });
+  }
+}); */
+
+
+app.post("/api/all-users", async (req, res) => {
+  try {
+    const { databaseName, userId } = req.body;
+
+    console.log("ALL USERS API");
+    console.log("databaseName =", databaseName);
+    console.log("userId =", userId);
+
+    if (!databaseName || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and userId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request().input("userid", sql.VarChar, userId)
+      .query(`
+        SELECT 
+            UNQID AS data,
+            SM63_6 AS value
+        FROM SM63
+        WHERE SM63_12 IN
+        (
+            SELECT data
+            FROM dbo.split(
+                (
+                    SELECT SM63_12
+                    FROM SM63
+                    WHERE SM63_5 = @userid
+                ),
+                ','
+            )
+        )
+        ORDER BY SM63_6
+      `);
+
+    console.log("ALL USERS RESULT =", result.recordset);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.log("ALL USERS ERROR =", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
     });
   }
 });

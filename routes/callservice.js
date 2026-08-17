@@ -23,7 +23,8 @@ router.post("/save-sales-call", async (req, res) => {
             nextFollowUpDate,
             callPurpose,
             paymentAfterDays,
-            expectedPaymentDate
+            expectedPaymentDate,
+            products
 
         } = req.body;
 
@@ -121,6 +122,12 @@ router.post("/save-sales-call", async (req, res) => {
     sql.Date,
     expectedPaymentDate
 )
+
+ .input(
+                "PRODUCTS",
+                sql.NVarChar(sql.MAX),
+                JSON.stringify(products || [])
+            )
 
             .execute("A_SP_SALES_CALL");
 
