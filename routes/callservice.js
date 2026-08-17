@@ -147,13 +147,6 @@ router.post("/save-sales-call", async (req, res) => {
     }
 });
 
-
-const express = require("express");
-const router = express.Router();
-
-const sql = require("mssql");
-const { getPool } = require("../config/db");
-
 router.post("/get-products", async (req, res) => {
     try {
 
