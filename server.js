@@ -2957,11 +2957,11 @@ app.post("/api/task-dashboard", async (req, res) => {
 
         FROM MA_ChatTasks T
 
-        LEFT JOIN SM63 AB
-          ON AB.SM63_5 = T.AssignedBy
+       LEFT JOIN SM63 AB
+  ON AB.SM63_5 = T.AssignedBy
 
-        LEFT JOIN SM63 AT
-          ON AT.SM63_5 = T.AssignedTo
+LEFT JOIN SM63 AT
+  ON AT.UNQID = T.AssignedTo
 
         ${whereCondition}
 
