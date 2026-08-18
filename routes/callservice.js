@@ -245,4 +245,50 @@ router.post("/get-products", async (req, res) => {
     }
 });
 
+router.post("/get-customer-outstanding", async (req, res) => {
+
+    try {
+
+        const {
+            databaseName,
+            customerUnq
+        } = req.body;
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+
+            .input(
+                "WHAT",
+                sql.VarChar(50),
+                "GET_OUTSTANDING"
+            )
+
+            .input(
+                "CUSTOMERUNQ",
+                sql.UniqueIdentifier,
+                customerUnq
+            )
+
+            .execute("A_SP_SALES_CALL");
+
+        res.json({
+            success: true,
+            data: result.recordset
+        });
+
+    } catch (error) {
+
+        console.error(
+            "GET CUSTOMER OUTSTANDING ERROR:",
+            error
+        );
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 module.exports = router;
