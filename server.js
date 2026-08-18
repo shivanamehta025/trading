@@ -3320,10 +3320,6 @@ app.post("/api/task-request-count", async (req, res) => {
     console.log("userId =", userId);
     console.log("=================================");
 
-    // --------------------------------------------------
-    // VALIDATION
-    // --------------------------------------------------
-
     if (!databaseName) {
       return res.status(400).json({
         success: false,
@@ -3338,60 +3334,74 @@ app.post("/api/task-request-count", async (req, res) => {
       });
     }
 
-    // --------------------------------------------------
-    // DATABASE
-    // --------------------------------------------------
-
     const pool = await getPool(databaseName);
 
-    // --------------------------------------------------
-    // GET LATEST PENDING TASK
-    // ASSIGNED TO LOGGED-IN USER
-    // --------------------------------------------------
-
-    const result = await pool
+    // Find logged-in employee
+    const employeeResult = await pool
       .request()
-      .input("UserId", sql.NVarChar(100), userId).query(`
+      .input("UserId", sql.NVarChar(100), userId)
+      .query(`
         SELECT TOP 1
-          TaskId,
-          CreatedDate
-        FROM MA_ChatTasks
-        WHERE AssignedTo = @UserId
-          AND Status = 'Pending'
-        ORDER BY CreatedDate DESC
+          UNQID,
+          SM63_5 AS UserId,
+          SM63_6 AS UserName
+        FROM SM63
+        WHERE SM63_5 = @UserId
       `);
 
-    // --------------------------------------------------
-    // NO TASK
-    // --------------------------------------------------
+    const employee = employeeResult.recordset[0];
 
-    if (result.recordset.length === 0) {
-      return res.status(200).json({
-        success: true,
-        count: 0,
-        latestTaskDate: null,
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found in SM63",
       });
     }
 
-    // --------------------------------------------------
-    // LATEST TASK
-    // --------------------------------------------------
+    const employeeUnqId = employee.UNQID;
 
-    const latestTask = result.recordset[0];
+    console.log("USER ID =", userId);
+    console.log("EMPLOYEE UNQID =", employeeUnqId);
+    console.log("USER NAME =", employee.UserName);
 
-    console.log("LATEST TASK ID =", latestTask.TaskId);
+    // Get pending tasks assigned to logged-in employee
+    const result = await pool
+      .request()
+      .input(
+        "EmployeeUnqId",
+        sql.UniqueIdentifier,
+        employeeUnqId
+      )
+      .query(`
+        SELECT
+          COUNT(*) AS TaskRequestCount,
+          MAX(CreatedDate) AS LatestTaskDate
+        FROM MA_ChatTasks
+        WHERE
+          AssignedTo = @EmployeeUnqId
+          AND Status = 'Pending'
+      `);
 
-    console.log("LATEST TASK DATE =", latestTask.CreatedDate);
+    const row = result.recordset[0];
 
-    // --------------------------------------------------
-    // RESPONSE
-    // --------------------------------------------------
+    const count = Number(row?.TaskRequestCount) || 0;
+
+    const latestTaskDate = row?.LatestTaskDate || null;
+
+    console.log("TASK REQUEST COUNT =", count);
+    console.log("LATEST TASK DATE =", latestTaskDate);
 
     return res.status(200).json({
       success: true,
-      count: 1,
-      latestTaskDate: latestTask.CreatedDate,
+      count: count,
+      latestTaskDate: latestTaskDate,
+      user: {
+        userId: userId,
+        employeeUnqId: employeeUnqId,
+        userName: employee.UserName,
+      },
     });
+
   } catch (err) {
     console.error("=================================");
     console.error("TASK REQUEST COUNT ERROR");
@@ -3404,6 +3414,8 @@ app.post("/api/task-request-count", async (req, res) => {
     });
   }
 });
+
+
 const dashboardRoutes =
 require("./routes/dashboard");
 app.use("/api", dashboardRoutes);
