@@ -2080,27 +2080,30 @@ res.json(result.recordset);
 
 app.post("/api/all-users", async (req, res) => {
   try {
-    const { databaseName, userId } = req.body;
+    const { databaseName, userId, level } = req.body;
 
     console.log("ALL USERS API");
     console.log("databaseName =", databaseName);
     console.log("userId =", userId);
+    console.log("level =", level);
 
-    if (!databaseName || !userId) {
+    if (!databaseName || !userId || !level) {
       return res.status(400).json({
         success: false,
-        message: "databaseName and userId are required",
+        message: "databaseName, userId, and level are required",
       });
     }
 
     const pool = await getPool(databaseName);
 
-    const result = await pool.request().input("userid", sql.VarChar, userId)
-      .query(`
+    const result = await pool
+      .request()
+      .input("userid", sql.VarChar, userId)
+      .input("level", sql.Int, level).query(`
         SELECT 
             UNQID AS data,
             SM63_6 AS value
-        FROM SM63
+        FROM SM63 inner join sm61 on sm61.unqid=sm63_8 order by sm61.sm61_6
         WHERE SM63_12 IN
         (
             SELECT data
@@ -2108,10 +2111,11 @@ app.post("/api/all-users", async (req, res) => {
                 (
                     SELECT SM63_12
                     FROM SM63
-                    WHERE SM63_5 = @userid
+                    WHERE SM63_5 = @userid 
                 ),
                 ','
-            )
+            ) 
+                and sm61_9 >@level
         )
         ORDER BY SM63_6
       `);
