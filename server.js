@@ -3310,6 +3310,97 @@ app.post("/api/update-task-status", async (req, res) => {
   }
 });
 
+app.post("/api/task-request-count", async (req, res) => {
+  try {
+    const { databaseName, userId } = req.body;
+
+    console.log("=================================");
+    console.log("TASK REQUEST COUNT API");
+    console.log("databaseName =", databaseName);
+    console.log("userId =", userId);
+    console.log("=================================");
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    // ----------------------------------------------------------
+    // FIND LOGGED-IN EMPLOYEE UNQID
+    // ----------------------------------------------------------
+
+    const employeeResult = await pool
+      .request()
+      .input("UserId", sql.NVarChar(100), userId).query(`
+        SELECT TOP 1
+          UNQID,
+          SM63_5 AS UserId,
+          SM63_6 AS UserName
+        FROM SM63
+        WHERE SM63_5 = @UserId
+      `);
+
+    const employee = employeeResult.recordset[0];
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found in SM63",
+      });
+    }
+
+    const employeeUnqId = employee.UNQID;
+
+    // ----------------------------------------------------------
+    // COUNT TASKS ASSIGNED TO THIS EMPLOYEE
+    // ----------------------------------------------------------
+
+    const result = await pool
+      .request()
+      .input("EmployeeUnqId", sql.UniqueIdentifier, employeeUnqId).query(`
+        SELECT COUNT(*) AS TaskRequestCount
+        FROM MA_ChatTasks
+        WHERE
+          AssignedTo = @EmployeeUnqId
+          AND Status = 'Pending'
+      `);
+
+    const count = Number(result.recordset[0]?.TaskRequestCount) || 0;
+
+    console.log("TASK REQUEST COUNT =", count);
+
+    return res.status(200).json({
+      success: true,
+
+      count: count,
+
+      user: {
+        userId: userId,
+        employeeUnqId: employeeUnqId,
+        userName: employee.UserName,
+      },
+    });
+  } catch (err) {
+    console.error("TASK REQUEST COUNT ERROR =", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 const dashboardRoutes =
 require("./routes/dashboard");
 app.use("/api", dashboardRoutes);
