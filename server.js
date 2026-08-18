@@ -2500,6 +2500,153 @@ app.post('/api/category-best-month-customers',
   }
 );
 
+
+///////task assign work
+app.post("/api/assign-task", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      taskTitle,
+      taskDescription,
+      assignedBy,
+      assignedTo,
+      startDate,
+      dueDate,
+      priority,
+      status,
+      propertyCode,
+      assignedPropertyCode,
+    } = req.body;
+
+    console.log("=================================");
+    console.log("ASSIGN TASK API");
+    console.log("databaseName =", databaseName);
+    console.log("taskTitle =", taskTitle);
+    console.log("assignedBy =", assignedBy);
+    console.log("assignedTo =", assignedTo);
+    console.log("startDate =", startDate);
+    console.log("dueDate =", dueDate);
+    console.log("priority =", priority);
+    console.log("status =", status);
+    console.log("=================================");
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!taskTitle || !taskTitle.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Task title is required",
+      });
+    }
+
+    if (!assignedBy) {
+      return res.status(400).json({
+        success: false,
+        message: "AssignedBy is required",
+      });
+    }
+
+    if (!assignedTo) {
+      return res.status(400).json({
+        success: false,
+        message: "AssignedTo is required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+
+      .input("TaskTitle", sql.NVarChar(200), taskTitle.trim())
+
+      .input("TaskDescription", sql.NVarChar(sql.MAX), taskDescription || "")
+
+      .input("AssignedBy", sql.NVarChar(100), assignedBy)
+
+      .input("AssignedTo", sql.NVarChar(100), assignedTo)
+
+      .input("StartDate", sql.VarChar(10), startDate || null)
+
+      .input("DueDate", sql.VarChar(10), dueDate || null)
+
+      .input("Priority", sql.NVarChar(20), priority || "Medium")
+
+      .input("Status", sql.NVarChar(20), status || "Pending")
+
+      .input("DatabaseName", sql.NVarChar(100), databaseName)
+
+      .input("PropertyCode", sql.NVarChar(20), propertyCode || null)
+
+      .input(
+        "AssignedPropertyCode",
+        sql.NVarChar(20),
+        assignedPropertyCode || null,
+      ).query(`
+        INSERT INTO MA_ChatTasks
+        (
+          TaskId,
+          TaskTitle,
+          TaskDescription,
+          AssignedBy,
+          AssignedTo,
+          StartDate,
+          DueDate,
+          Priority,
+          Status,
+          CreatedDate,
+          DatabaseName,
+          PropertyCode,
+          AssignedPropertyCode
+        )
+        VALUES
+        (
+          NEWID(),
+          @TaskTitle,
+          @TaskDescription,
+          @AssignedBy,
+          @AssignedTo,
+
+          CASE
+            WHEN @StartDate IS NULL THEN NULL
+            ELSE CONVERT(datetime, @StartDate, 23)
+          END,
+
+          CASE
+            WHEN @DueDate IS NULL THEN NULL
+            ELSE CONVERT(datetime, @DueDate, 23)
+          END,
+
+          @Priority,
+          @Status,
+          GETDATE(),
+          @DatabaseName,
+          @PropertyCode,
+          @AssignedPropertyCode
+        )
+      `);
+
+    console.log("TASK INSERTED SUCCESSFULLY");
+
+    return res.json({
+      success: true,
+      message: "Task assigned successfully",
+    });
+  } catch (err) {
+    console.error("ASSIGN TASK ERROR =", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 const dashboardRoutes =
 require("./routes/dashboard");
 app.use("/api", dashboardRoutes);
