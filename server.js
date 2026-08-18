@@ -2501,7 +2501,10 @@ app.post('/api/category-best-month-customers',
 );
 
 
-///////task assign work
+// ============================================================
+// ASSIGN TASK
+// ============================================================
+
 app.post("/api/assign-task", async (req, res) => {
   try {
     const {
@@ -2518,17 +2521,31 @@ app.post("/api/assign-task", async (req, res) => {
       assignedPropertyCode,
     } = req.body;
 
+    // ========================================================
+    // LOG REQUEST
+    // ========================================================
+
     console.log("=================================");
     console.log("ASSIGN TASK API");
     console.log("databaseName =", databaseName);
     console.log("taskTitle =", taskTitle);
+    console.log("taskDescription =", taskDescription);
     console.log("assignedBy =", assignedBy);
     console.log("assignedTo =", assignedTo);
     console.log("startDate =", startDate);
     console.log("dueDate =", dueDate);
     console.log("priority =", priority);
     console.log("status =", status);
+    console.log("propertyCode =", propertyCode);
+    console.log(
+      "assignedPropertyCode =",
+      assignedPropertyCode
+    );
     console.log("=================================");
+
+    // ========================================================
+    // VALIDATION
+    // ========================================================
 
     if (!databaseName) {
       return res.status(400).json({
@@ -2558,36 +2575,186 @@ app.post("/api/assign-task", async (req, res) => {
       });
     }
 
+    // ========================================================
+    // DATE CONVERSION
+    // ========================================================
+    // Flutter sends:
+    //
+    // 2026-08-18
+    // 2026-08-20
+    //
+    // Convert them to JavaScript Date objects first.
+    // SQL Server receives them directly as datetime.
+    // ========================================================
+
+    let parsedStartDate = null;
+    let parsedDueDate = null;
+
+    if (startDate) {
+      parsedStartDate = new Date(startDate);
+
+      if (isNaN(parsedStartDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid startDate",
+        });
+      }
+    }
+
+    if (dueDate) {
+      parsedDueDate = new Date(dueDate);
+
+      if (isNaN(parsedDueDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid dueDate",
+        });
+      }
+    }
+
+    // ========================================================
+    // CHECK DATE ORDER
+    // ========================================================
+
+    if (
+      parsedStartDate &&
+      parsedDueDate &&
+      parsedDueDate < parsedStartDate
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Due date cannot be before start date",
+      });
+    }
+
+    // ========================================================
+    // GET DATABASE CONNECTION
+    // ========================================================
+
     const pool = await getPool(databaseName);
+
+    // ========================================================
+    // INSERT TASK
+    // ========================================================
 
     const result = await pool
       .request()
 
-      .input("TaskTitle", sql.NVarChar(200), taskTitle.trim())
+      // ------------------------------------------------------
+      // TASK TITLE
+      // ------------------------------------------------------
 
-      .input("TaskDescription", sql.NVarChar(sql.MAX), taskDescription || "")
+      .input(
+        "TaskTitle",
+        sql.NVarChar(200),
+        taskTitle.trim()
+      )
 
-      .input("AssignedBy", sql.NVarChar(100), assignedBy)
+      // ------------------------------------------------------
+      // TASK DESCRIPTION
+      // ------------------------------------------------------
 
-      .input("AssignedTo", sql.NVarChar(100), assignedTo)
+      .input(
+        "TaskDescription",
+        sql.NVarChar(sql.MAX),
+        taskDescription || null
+      )
 
-      .input("StartDate", sql.VarChar(10), startDate || null)
+      // ------------------------------------------------------
+      // ASSIGNED BY
+      // ------------------------------------------------------
 
-      .input("DueDate", sql.VarChar(10), dueDate || null)
+      .input(
+        "AssignedBy",
+        sql.NVarChar(100),
+        assignedBy
+      )
 
-      .input("Priority", sql.NVarChar(20), priority || "Medium")
+      // ------------------------------------------------------
+      // ASSIGNED TO
+      // ------------------------------------------------------
 
-      .input("Status", sql.NVarChar(20), status || "Pending")
+      .input(
+        "AssignedTo",
+        sql.NVarChar(100),
+        assignedTo
+      )
 
-      .input("DatabaseName", sql.NVarChar(100), databaseName)
+      // ------------------------------------------------------
+      // START DATE
+      // ------------------------------------------------------
 
-      .input("PropertyCode", sql.NVarChar(20), propertyCode || null)
+      .input(
+        "StartDate",
+        sql.DateTime,
+        parsedStartDate
+      )
+
+      // ------------------------------------------------------
+      // DUE DATE
+      // ------------------------------------------------------
+
+      .input(
+        "DueDate",
+        sql.DateTime,
+        parsedDueDate
+      )
+
+      // ------------------------------------------------------
+      // PRIORITY
+      // ------------------------------------------------------
+
+      .input(
+        "Priority",
+        sql.NVarChar(20),
+        priority || "Medium"
+      )
+
+      // ------------------------------------------------------
+      // STATUS
+      // ------------------------------------------------------
+
+      .input(
+        "Status",
+        sql.NVarChar(20),
+        status || "Pending"
+      )
+
+      // ------------------------------------------------------
+      // DATABASE NAME
+      // ------------------------------------------------------
+
+      .input(
+        "DatabaseName",
+        sql.NVarChar(100),
+        databaseName
+      )
+
+      // ------------------------------------------------------
+      // PROPERTY CODE
+      // ------------------------------------------------------
+
+      .input(
+        "PropertyCode",
+        sql.NVarChar(20),
+        propertyCode || null
+      )
+
+      // ------------------------------------------------------
+      // ASSIGNED PROPERTY CODE
+      // ------------------------------------------------------
 
       .input(
         "AssignedPropertyCode",
         sql.NVarChar(20),
-        assignedPropertyCode || null,
-      ).query(`
+        assignedPropertyCode || null
+      )
+
+      // ======================================================
+      // SQL INSERT
+      // ======================================================
+
+      .query(`
         INSERT INTO MA_ChatTasks
         (
           TaskId,
@@ -2611,17 +2778,8 @@ app.post("/api/assign-task", async (req, res) => {
           @TaskDescription,
           @AssignedBy,
           @AssignedTo,
-
-          CASE
-            WHEN @StartDate IS NULL THEN NULL
-            ELSE CONVERT(datetime, @StartDate, 23)
-          END,
-
-          CASE
-            WHEN @DueDate IS NULL THEN NULL
-            ELSE CONVERT(datetime, @DueDate, 23)
-          END,
-
+          @StartDate,
+          @DueDate,
           @Priority,
           @Status,
           GETDATE(),
@@ -2631,14 +2789,42 @@ app.post("/api/assign-task", async (req, res) => {
         )
       `);
 
-    console.log("TASK INSERTED SUCCESSFULLY");
+    // ========================================================
+    // SUCCESS
+    // ========================================================
 
-    return res.json({
+    console.log(
+      "TASK INSERTED SUCCESSFULLY"
+    );
+
+    console.log(
+      "INSERTED ROW COUNT =",
+      result.rowsAffected
+    );
+
+    return res.status(200).json({
       success: true,
       message: "Task assigned successfully",
     });
+
   } catch (err) {
-    console.error("ASSIGN TASK ERROR =", err);
+
+    // ========================================================
+    // ERROR
+    // ========================================================
+
+    console.error(
+      "================================="
+    );
+
+    console.error(
+      "ASSIGN TASK ERROR =",
+      err
+    );
+
+    console.error(
+      "================================="
+    );
 
     return res.status(500).json({
       success: false,
