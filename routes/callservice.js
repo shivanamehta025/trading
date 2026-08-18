@@ -31,21 +31,9 @@ router.post("/save-sales-call", async (req, res) => {
         console.log("Database:", databaseName);
         console.log("Customer:", customerUnq);
         console.log("Salesperson:", salespersonUnq);
-        console.log("Customer Name:", customerName);
-        console.log("Mobile:", mobileNo);
-        console.log("Call Start:", callStartTime);
-        console.log("Call Connected:", callConnectedTime);
-        console.log("Call End:", callEndTime);
-        console.log("Duration:", durationSeconds);
-        console.log("Status:", callStatus);
-        console.log("Outcome:", callOutcome);
-        console.log("Remarks:", remarks);
-        console.log("Next Followup:", nextFollowUpDate);
         console.log("Purpose:", callPurpose);
-        console.log("Payment Days:", paymentAfterDays);
-        console.log("Expected Payment:", expectedPaymentDate);
         console.log("Products:", products);
-        console.log("====================================");
+        console.log("=====================================");
 
         const pool = await getPool(databaseName);
 
@@ -60,119 +48,102 @@ router.post("/save-sales-call", async (req, res) => {
             .input(
                 "CUSTOMERUNQ",
                 sql.UniqueIdentifier,
-                customerUnq || null
+                customerUnq
             )
 
             .input(
                 "SALESPERSONUNQ",
                 sql.VarChar(100),
-                salespersonUnq || null
+                salespersonUnq
             )
 
             .input(
                 "CUSTOMERNAME",
                 sql.VarChar(250),
-                customerName || null
+                customerName
             )
 
             .input(
                 "MOBILENO",
                 sql.VarChar(30),
-                mobileNo || null
+                mobileNo
             )
 
             .input(
                 "CALLSTARTTIME",
                 sql.DateTime,
                 callStartTime
-                    ? new Date(callStartTime)
-                    : null
             )
 
             .input(
                 "CALLCONNECTEDTIME",
                 sql.DateTime,
                 callConnectedTime
-                    ? new Date(callConnectedTime)
-                    : null
             )
 
             .input(
                 "CALLENDTIME",
                 sql.DateTime,
                 callEndTime
-                    ? new Date(callEndTime)
-                    : null
             )
 
             .input(
                 "DURATIONSECONDS",
                 sql.Int,
-                Number(durationSeconds) || 0
+                durationSeconds
             )
 
             .input(
                 "CALLSTATUS",
                 sql.VarChar(30),
-                callStatus || null
+                callStatus
             )
 
             .input(
                 "CALLOUTCOME",
                 sql.VarChar(50),
-                callOutcome || null
+                callOutcome
             )
 
             .input(
                 "REMARKS",
                 sql.VarChar(1000),
-                remarks || null
+                remarks
             )
 
             .input(
                 "NEXTFOLLOWUPDATE",
                 sql.Date,
                 nextFollowUpDate
-                    ? new Date(nextFollowUpDate)
-                    : null
             )
 
             .input(
                 "CALLPURPOSE",
                 sql.VarChar(30),
-                callPurpose || null
+                callPurpose
             )
 
             .input(
                 "PAYMENTAFTERDAYS",
                 sql.Int,
-                paymentAfterDays != null
-                    ? Number(paymentAfterDays)
-                    : null
+                paymentAfterDays
             )
 
             .input(
                 "EXPECTEDPAYMENTDATE",
                 sql.Date,
                 expectedPaymentDate
-                    ? new Date(expectedPaymentDate)
-                    : null
             )
 
             .input(
                 "PRODUCTS",
                 sql.NVarChar(sql.MAX),
-                JSON.stringify(products || [])
+                products || ""
             )
 
             .execute("A_SP_SALES_CALL");
 
-
-        console.log(
-            "SP RECORDSET:",
-            result.recordset
-        );
-
+        console.log("SP RECORDSET:", result.recordset);
 
         const spResult =
             result.recordset &&
@@ -180,67 +151,33 @@ router.post("/save-sales-call", async (req, res) => {
                 ? result.recordset[0]
                 : null;
 
-
-        if (!spResult) {
-
-            console.error(
-                "SP DID NOT RETURN RESULT"
-            );
-
-            return res.status(500).json({
-                success: false,
-                message: "Stored procedure did not return a result"
-            });
-        }
-
-
-        const success =
-            Number(spResult.Success) === 1;
-
-
-        const message =
-            spResult.Message ||
-            (
-                success
-                    ? "Call saved successfully"
-                    : "Call was not saved"
-            );
-
-
         console.log(
             "SP SUCCESS:",
-            spResult.Success
+            spResult?.Success
         );
 
         console.log(
             "SP MESSAGE:",
-            message
+            spResult?.Message
         );
 
-
         return res.json({
-            success: success,
-            message: message,
-            data: spResult,
-        });
+            success:
+                spResult?.Success === 1,
 
+            message:
+                spResult?.Message,
+
+            data:
+                result.recordset
+        });
 
     } catch (error) {
 
         console.error(
-            "===================================="
+            "SAVE SALES CALL ERROR:",
+            error
         );
-
-        console.error(
-            "SAVE SALES CALL ERROR:"
-        );
-
-        console.error(error);
-
-        console.error(
-            "===================================="
-        );
-
 
         return res.status(500).json({
             success: false,
