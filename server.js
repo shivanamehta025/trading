@@ -2833,6 +2833,303 @@ app.post("/api/assign-task", async (req, res) => {
   }
 });
 
+
+app.post("/api/task-dashboard", async (req, res) => {
+  try {
+    const { databaseName, userId, viewType = "All" } = req.body;
+
+    console.log("=================================");
+    console.log("TASK DASHBOARD API");
+    console.log("databaseName =", databaseName);
+    console.log("userId =", userId);
+    console.log("viewType =", viewType);
+    console.log("=================================");
+
+    // ----------------------------------------------------------
+    // VALIDATION
+    // ----------------------------------------------------------
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    // ----------------------------------------------------------
+    // DATABASE CONNECTION
+    // ----------------------------------------------------------
+
+    const pool = await getPool(databaseName);
+
+    // ----------------------------------------------------------
+    // TASK QUERY
+    // ----------------------------------------------------------
+
+    let whereCondition = "";
+
+    if (viewType === "Individual") {
+      // Tasks assigned TO logged-in user
+      whereCondition = `
+        WHERE T.AssignedTo = @UserId
+      `;
+    } else if (viewType === "Group") {
+      // Tasks assigned BY logged-in user
+      // to other employees
+      whereCondition = `
+        WHERE T.AssignedBy = @UserId
+          AND T.AssignedTo <> @UserId
+      `;
+    } else {
+      // ALL tasks related to logged-in user
+      whereCondition = `
+        WHERE
+          T.AssignedBy = @UserId
+          OR
+          T.AssignedTo = @UserId
+      `;
+    }
+
+    const result = await pool
+      .request()
+
+      .input("UserId", sql.NVarChar(100), userId).query(`
+
+        SELECT
+
+          T.TaskId,
+
+          T.TaskTitle,
+
+          T.TaskDescription,
+
+          T.AssignedBy,
+
+          ISNULL(
+            AB.SM63_6,
+            T.AssignedBy
+          ) AS AssignedByName,
+
+          T.AssignedTo,
+
+          ISNULL(
+            AT.SM63_6,
+            T.AssignedTo
+          ) AS AssignedToName,
+
+          T.StartDate,
+
+          T.DueDate,
+
+          T.Priority,
+
+          T.Status,
+
+          T.CreatedDate,
+
+          T.DatabaseName,
+
+          T.PropertyCode,
+
+          T.AssignedPropertyCode,
+
+          CASE
+            WHEN
+              T.Status NOT IN
+              (
+                'Completed',
+                'Cancelled'
+              )
+              AND
+              T.DueDate IS NOT NULL
+              AND
+              CAST(T.DueDate AS DATE) < CAST(GETDATE() AS DATE)
+            THEN 1
+            ELSE 0
+          END AS IsOverdue
+
+        FROM MA_ChatTasks T
+
+        LEFT JOIN SM63 AB
+          ON AB.SM63_5 = T.AssignedBy
+
+        LEFT JOIN SM63 AT
+          ON AT.SM63_5 = T.AssignedTo
+
+        ${whereCondition}
+
+        ORDER BY
+          CASE
+            WHEN T.Status = 'Pending' THEN 1
+            WHEN T.Status = 'In Progress' THEN 2
+            WHEN T.Status = 'Completed' THEN 3
+            ELSE 4
+          END,
+
+          T.DueDate ASC,
+
+          T.CreatedDate DESC
+
+      `);
+
+    // ----------------------------------------------------------
+    // SUMMARY
+    // ----------------------------------------------------------
+
+    const tasks = result.recordset;
+
+    const total = tasks.length;
+
+    const pending = tasks.filter(
+      (x) => String(x.Status).toLowerCase() === "pending",
+    ).length;
+
+    const inProgress = tasks.filter(
+      (x) => String(x.Status).toLowerCase() === "in progress",
+    ).length;
+
+    const completed = tasks.filter(
+      (x) => String(x.Status).toLowerCase() === "completed",
+    ).length;
+
+    const cancelled = tasks.filter(
+      (x) => String(x.Status).toLowerCase() === "cancelled",
+    ).length;
+
+    const overdue = tasks.filter((x) => Number(x.IsOverdue) === 1).length;
+
+    console.log("TASK COUNT =", total);
+    console.log("PENDING =", pending);
+    console.log("IN PROGRESS =", inProgress);
+    console.log("COMPLETED =", completed);
+    console.log("CANCELLED =", cancelled);
+    console.log("OVERDUE =", overdue);
+
+    // ----------------------------------------------------------
+    // RESPONSE
+    // ----------------------------------------------------------
+
+    return res.status(200).json({
+      success: true,
+
+      summary: {
+        total: total,
+        pending: pending,
+        inProgress: inProgress,
+        completed: completed,
+        cancelled: cancelled,
+        overdue: overdue,
+      },
+
+      data: tasks,
+    });
+  } catch (err) {
+    console.error("=================================");
+    console.error("TASK DASHBOARD ERROR");
+    console.error(err);
+    console.error("=================================");
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ============================================================
+// UPDATE TASK STATUS
+// ============================================================
+
+app.post("/api/update-task-status", async (req, res) => {
+  try {
+    const { databaseName, taskId, status } = req.body;
+
+    console.log("=================================");
+    console.log("UPDATE TASK STATUS");
+    console.log("databaseName =", databaseName);
+    console.log("taskId =", taskId);
+    console.log("status =", status);
+    console.log("=================================");
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!taskId) {
+      return res.status(400).json({
+        success: false,
+        message: "taskId is required",
+      });
+    }
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: "status is required",
+      });
+    }
+
+    const allowedStatuses = [
+      "Pending",
+      "In Progress",
+      "Completed",
+      "Cancelled",
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid task status",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+
+      .input("TaskId", sql.UniqueIdentifier, taskId)
+
+      .input("Status", sql.NVarChar(20), status).query(`
+
+        UPDATE MA_ChatTasks
+
+        SET Status = @Status
+
+        WHERE TaskId = @TaskId
+
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Task status updated successfully",
+    });
+  } catch (err) {
+    console.error("UPDATE TASK STATUS ERROR =", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 const dashboardRoutes =
 require("./routes/dashboard");
 app.use("/api", dashboardRoutes);
