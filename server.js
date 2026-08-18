@@ -2505,335 +2505,6 @@ app.post('/api/category-best-month-customers',
 // ASSIGN TASK
 // ============================================================
 
-app.post("/api/assign-task", async (req, res) => {
-  try {
-    const {
-      databaseName,
-      taskTitle,
-      taskDescription,
-      assignedBy,
-      assignedTo,
-      startDate,
-      dueDate,
-      priority,
-      status,
-      propertyCode,
-      assignedPropertyCode,
-    } = req.body;
-
-    // ========================================================
-    // LOG REQUEST
-    // ========================================================
-
-    console.log("=================================");
-    console.log("ASSIGN TASK API");
-    console.log("databaseName =", databaseName);
-    console.log("taskTitle =", taskTitle);
-    console.log("taskDescription =", taskDescription);
-    console.log("assignedBy =", assignedBy);
-    console.log("assignedTo =", assignedTo);
-    console.log("startDate =", startDate);
-    console.log("dueDate =", dueDate);
-    console.log("priority =", priority);
-    console.log("status =", status);
-    console.log("propertyCode =", propertyCode);
-    console.log(
-      "assignedPropertyCode =",
-      assignedPropertyCode
-    );
-    console.log("=================================");
-
-    // ========================================================
-    // VALIDATION
-    // ========================================================
-
-    if (!databaseName) {
-      return res.status(400).json({
-        success: false,
-        message: "databaseName is required",
-      });
-    }
-
-    if (!taskTitle || !taskTitle.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Task title is required",
-      });
-    }
-
-    if (!assignedBy) {
-      return res.status(400).json({
-        success: false,
-        message: "AssignedBy is required",
-      });
-    }
-
-    if (!assignedTo) {
-      return res.status(400).json({
-        success: false,
-        message: "AssignedTo is required",
-      });
-    }
-
-    // ========================================================
-    // DATE CONVERSION
-    // ========================================================
-    // Flutter sends:
-    //
-    // 2026-08-18
-    // 2026-08-20
-    //
-    // Convert them to JavaScript Date objects first.
-    // SQL Server receives them directly as datetime.
-    // ========================================================
-
-    let parsedStartDate = null;
-    let parsedDueDate = null;
-
-    if (startDate) {
-      parsedStartDate = new Date(startDate);
-
-      if (isNaN(parsedStartDate.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid startDate",
-        });
-      }
-    }
-
-    if (dueDate) {
-      parsedDueDate = new Date(dueDate);
-
-      if (isNaN(parsedDueDate.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid dueDate",
-        });
-      }
-    }
-
-    // ========================================================
-    // CHECK DATE ORDER
-    // ========================================================
-
-    if (
-      parsedStartDate &&
-      parsedDueDate &&
-      parsedDueDate < parsedStartDate
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Due date cannot be before start date",
-      });
-    }
-
-    // ========================================================
-    // GET DATABASE CONNECTION
-    // ========================================================
-
-    const pool = await getPool(databaseName);
-
-    // ========================================================
-    // INSERT TASK
-    // ========================================================
-
-    const result = await pool
-      .request()
-
-      // ------------------------------------------------------
-      // TASK TITLE
-      // ------------------------------------------------------
-
-      .input(
-        "TaskTitle",
-        sql.NVarChar(200),
-        taskTitle.trim()
-      )
-
-      // ------------------------------------------------------
-      // TASK DESCRIPTION
-      // ------------------------------------------------------
-
-      .input(
-        "TaskDescription",
-        sql.NVarChar(sql.MAX),
-        taskDescription || null
-      )
-
-      // ------------------------------------------------------
-      // ASSIGNED BY
-      // ------------------------------------------------------
-
-      .input(
-        "AssignedBy",
-        sql.NVarChar(100),
-        assignedBy
-      )
-
-      // ------------------------------------------------------
-      // ASSIGNED TO
-      // ------------------------------------------------------
-
-      .input(
-        "AssignedTo",
-        sql.NVarChar(100),
-        assignedTo
-      )
-
-      // ------------------------------------------------------
-      // START DATE
-      // ------------------------------------------------------
-
-      .input(
-        "StartDate",
-        sql.DateTime,
-        parsedStartDate
-      )
-
-      // ------------------------------------------------------
-      // DUE DATE
-      // ------------------------------------------------------
-
-      .input(
-        "DueDate",
-        sql.DateTime,
-        parsedDueDate
-      )
-
-      // ------------------------------------------------------
-      // PRIORITY
-      // ------------------------------------------------------
-
-      .input(
-        "Priority",
-        sql.NVarChar(20),
-        priority || "Medium"
-      )
-
-      // ------------------------------------------------------
-      // STATUS
-      // ------------------------------------------------------
-
-      .input(
-        "Status",
-        sql.NVarChar(20),
-        status || "Pending"
-      )
-
-      // ------------------------------------------------------
-      // DATABASE NAME
-      // ------------------------------------------------------
-
-      .input(
-        "DatabaseName",
-        sql.NVarChar(100),
-        databaseName
-      )
-
-      // ------------------------------------------------------
-      // PROPERTY CODE
-      // ------------------------------------------------------
-
-      .input(
-        "PropertyCode",
-        sql.NVarChar(20),
-        propertyCode || null
-      )
-
-      // ------------------------------------------------------
-      // ASSIGNED PROPERTY CODE
-      // ------------------------------------------------------
-
-      .input(
-        "AssignedPropertyCode",
-        sql.NVarChar(20),
-        assignedPropertyCode || null
-      )
-
-      // ======================================================
-      // SQL INSERT
-      // ======================================================
-
-      .query(`
-        INSERT INTO MA_ChatTasks
-        (
-          TaskId,
-          TaskTitle,
-          TaskDescription,
-          AssignedBy,
-          AssignedTo,
-          StartDate,
-          DueDate,
-          Priority,
-          Status,
-          CreatedDate,
-          DatabaseName,
-          PropertyCode,
-          AssignedPropertyCode
-        )
-        VALUES
-        (
-          NEWID(),
-          @TaskTitle,
-          @TaskDescription,
-          @AssignedBy,
-          @AssignedTo,
-          @StartDate,
-          @DueDate,
-          @Priority,
-          @Status,
-          GETDATE(),
-          @DatabaseName,
-          @PropertyCode,
-          @AssignedPropertyCode
-        )
-      `);
-
-    // ========================================================
-    // SUCCESS
-    // ========================================================
-
-    console.log(
-      "TASK INSERTED SUCCESSFULLY"
-    );
-
-    console.log(
-      "INSERTED ROW COUNT =",
-      result.rowsAffected
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "Task assigned successfully",
-    });
-
-  } catch (err) {
-
-    // ========================================================
-    // ERROR
-    // ========================================================
-
-    console.error(
-      "================================="
-    );
-
-    console.error(
-      "ASSIGN TASK ERROR =",
-      err
-    );
-
-    console.error(
-      "================================="
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
-});
-
-
 app.post("/api/task-dashboard", async (req, res) => {
   try {
     const { databaseName, userId, viewType = "All" } = req.body;
@@ -3310,12 +2981,159 @@ app.post("/api/update-task-status", async (req, res) => {
   }
 });
 
+// ============================================================
+// TASK REQUEST COUNT
+// ============================================================
+
+// ============================================================
+// TASK REQUEST COUNT
+// ============================================================
+
 app.post("/api/task-request-count", async (req, res) => {
   try {
     const { databaseName, userId } = req.body;
 
+    // ========================================================
+    // LOG REQUEST
+    // ========================================================
+
     console.log("=================================");
     console.log("TASK REQUEST COUNT API");
+    console.log("databaseName =", databaseName);
+    console.log("userId =", userId);
+    console.log("=================================");
+
+    // ========================================================
+    // VALIDATION
+    // ========================================================
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    // ========================================================
+    // GET DATABASE CONNECTION
+    // ========================================================
+
+    const pool = await getPool(databaseName);
+
+    // ========================================================
+    // FIND LOGGED-IN EMPLOYEE
+    // ========================================================
+
+    const employeeResult = await pool
+      .request()
+      .input("UserId", sql.NVarChar(100), userId).query(`
+        SELECT TOP 1
+          UNQID,
+          SM63_5 AS UserId,
+          SM63_6 AS UserName
+        FROM SM63
+        WHERE SM63_5 = @UserId
+      `);
+
+    const employee = employeeResult.recordset[0];
+
+    // ========================================================
+    // USER NOT FOUND
+    // ========================================================
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found in SM63",
+      });
+    }
+
+    const employeeUnqId = employee.UNQID;
+
+    console.log("USER ID =", userId);
+
+    console.log("EMPLOYEE UNQID =", employeeUnqId);
+
+    console.log("USER NAME =", employee.UserName);
+
+    // ========================================================
+    // GET UNREAD PENDING TASK COUNT
+    // ========================================================
+
+    const result = await pool
+      .request()
+      .input("EmployeeUnqId", sql.UniqueIdentifier, employeeUnqId).query(`
+        SELECT
+          COUNT(*) AS TaskRequestCount
+        FROM MA_ChatTasks
+        WHERE
+          AssignedTo = @EmployeeUnqId
+          AND Status = 'Pending'
+          AND ISNULL(IsRead, 0) = 0
+      `);
+
+    // ========================================================
+    // GET COUNT
+    // ========================================================
+
+    const row = result.recordset[0];
+
+    const count = Number(row?.TaskRequestCount) || 0;
+
+    // ========================================================
+    // LOG COUNT
+    // ========================================================
+
+    console.log("UNREAD TASK REQUEST COUNT =", count);
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
+    return res.status(200).json({
+      success: true,
+
+      count: count,
+
+      user: {
+        userId: userId,
+        employeeUnqId: employeeUnqId,
+        userName: employee.UserName,
+      },
+    });
+  } catch (err) {
+    // ========================================================
+    // ERROR
+    // ========================================================
+
+    console.error("=================================");
+    console.error("TASK REQUEST COUNT ERROR");
+    console.error(err);
+    console.error("=================================");
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ============================================================
+// MARK TASK REQUESTS AS READ
+// ============================================================
+
+app.post("/api/task-request-read", async (req, res) => {
+  try {
+    const { databaseName, userId } = req.body;
+
+    console.log("=================================");
+    console.log("MARK TASK REQUESTS AS READ");
     console.log("databaseName =", databaseName);
     console.log("userId =", userId);
     console.log("=================================");
@@ -3336,15 +3154,13 @@ app.post("/api/task-request-count", async (req, res) => {
 
     const pool = await getPool(databaseName);
 
-    // Find logged-in employee
+    // Get logged-in employee UNQID
     const employeeResult = await pool
       .request()
-      .input("UserId", sql.NVarChar(100), userId)
-      .query(`
+      .input("UserId", sql.NVarChar(100), userId).query(`
         SELECT TOP 1
           UNQID,
-          SM63_5 AS UserId,
-          SM63_6 AS UserName
+          SM63_5 AS UserId
         FROM SM63
         WHERE SM63_5 = @UserId
       `);
@@ -3360,53 +3176,26 @@ app.post("/api/task-request-count", async (req, res) => {
 
     const employeeUnqId = employee.UNQID;
 
-    console.log("USER ID =", userId);
-    console.log("EMPLOYEE UNQID =", employeeUnqId);
-    console.log("USER NAME =", employee.UserName);
-
-    // Get pending tasks assigned to logged-in employee
+    // Mark all unread pending tasks as read
     const result = await pool
       .request()
-      .input(
-        "EmployeeUnqId",
-        sql.UniqueIdentifier,
-        employeeUnqId
-      )
-      .query(`
-        SELECT
-          COUNT(*) AS TaskRequestCount,
-          MAX(CreatedDate) AS LatestTaskDate
-        FROM MA_ChatTasks
+      .input("EmployeeUnqId", sql.UniqueIdentifier, employeeUnqId).query(`
+        UPDATE MA_ChatTasks
+        SET IsRead = 1
         WHERE
           AssignedTo = @EmployeeUnqId
           AND Status = 'Pending'
+          AND ISNULL(IsRead, 0) = 0
       `);
 
-    const row = result.recordset[0];
+    console.log("TASKS MARKED READ =", result.rowsAffected[0]);
 
-    const count = Number(row?.TaskRequestCount) || 0;
-
-    const latestTaskDate = row?.LatestTaskDate || null;
-
-    console.log("TASK REQUEST COUNT =", count);
-    console.log("LATEST TASK DATE =", latestTaskDate);
-
-    return res.status(200).json({
+    return res.json({
       success: true,
-      count: count,
-      latestTaskDate: latestTaskDate,
-      user: {
-        userId: userId,
-        employeeUnqId: employeeUnqId,
-        userName: employee.UserName,
-      },
+      markedRead: result.rowsAffected[0] || 0,
     });
-
   } catch (err) {
-    console.error("=================================");
-    console.error("TASK REQUEST COUNT ERROR");
-    console.error(err);
-    console.error("=================================");
+    console.error("MARK TASK READ ERROR =", err);
 
     return res.status(500).json({
       success: false,
