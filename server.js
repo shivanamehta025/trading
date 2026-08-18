@@ -2500,9 +2500,268 @@ app.post('/api/category-best-month-customers',
   }
 );
 
+app.post("/api/assign-task", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      taskTitle,
+      taskDescription,
+      assignedBy,
+      assignedTo,
+      startDate,
+      dueDate,
+      priority,
+      status,
+      propertyCode,
+      assignedPropertyCode,
+    } = req.body;
 
+    // ========================================================
+    // LOG REQUEST
+    // ========================================================
+
+    console.log("=================================");
+    console.log("ASSIGN TASK API");
+    console.log("databaseName =", databaseName);
+    console.log("taskTitle =", taskTitle);
+    console.log("taskDescription =", taskDescription);
+    console.log("assignedBy =", assignedBy);
+    console.log("assignedTo =", assignedTo);
+    console.log("startDate =", startDate);
+    console.log("dueDate =", dueDate);
+    console.log("priority =", priority);
+    console.log("status =", status);
+    console.log("propertyCode =", propertyCode);
+    console.log("assignedPropertyCode =", assignedPropertyCode);
+    console.log("=================================");
+
+    // ========================================================
+    // VALIDATION
+    // ========================================================
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!taskTitle || !taskTitle.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Task title is required",
+      });
+    }
+
+    if (!assignedBy) {
+      return res.status(400).json({
+        success: false,
+        message: "AssignedBy is required",
+      });
+    }
+
+    if (!assignedTo) {
+      return res.status(400).json({
+        success: false,
+        message: "AssignedTo is required",
+      });
+    }
+
+    // ========================================================
+    // DATE CONVERSION
+    // ========================================================
+
+    let parsedStartDate = null;
+    let parsedDueDate = null;
+
+    if (startDate) {
+      parsedStartDate = new Date(startDate);
+
+      if (isNaN(parsedStartDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid startDate",
+        });
+      }
+    }
+
+    if (dueDate) {
+      parsedDueDate = new Date(dueDate);
+
+      if (isNaN(parsedDueDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid dueDate",
+        });
+      }
+    }
+
+    // ========================================================
+    // CHECK DATE ORDER
+    // ========================================================
+
+    if (parsedStartDate && parsedDueDate && parsedDueDate < parsedStartDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Due date cannot be before start date",
+      });
+    }
+
+    // ========================================================
+    // GET DATABASE CONNECTION
+    // ========================================================
+
+    const pool = await getPool(databaseName);
+
+    // ========================================================
+    // INSERT TASK
+    // ========================================================
+
+    const result =
+      await // ------------------------------------------------------
+      // SQL INSERT
+      // ------------------------------------------------------
+
+      pool
+        .request()
+
+        // ------------------------------------------------------
+        // TASK TITLE
+        // ------------------------------------------------------
+
+        .input("TaskTitle", sql.NVarChar(200), taskTitle.trim())
+
+        // ------------------------------------------------------
+        // TASK DESCRIPTION
+        // ------------------------------------------------------
+
+        .input(
+          "TaskDescription",
+          sql.NVarChar(sql.MAX),
+          taskDescription || null,
+        )
+
+        // ------------------------------------------------------
+        // ASSIGNED BY
+        // ------------------------------------------------------
+
+        .input("AssignedBy", sql.NVarChar(100), assignedBy)
+
+        // ------------------------------------------------------
+        // ASSIGNED TO
+        // ------------------------------------------------------
+
+        .input("AssignedTo", sql.NVarChar(100), assignedTo)
+
+        // ------------------------------------------------------
+        // START DATE
+        // ------------------------------------------------------
+
+        .input("StartDate", sql.DateTime, parsedStartDate)
+
+        // ------------------------------------------------------
+        // DUE DATE
+        // ------------------------------------------------------
+
+        .input("DueDate", sql.DateTime, parsedDueDate)
+
+        // ------------------------------------------------------
+        // PRIORITY
+        // ------------------------------------------------------
+
+        .input("Priority", sql.NVarChar(20), priority || "Medium")
+
+        // ------------------------------------------------------
+        // STATUS
+        // ------------------------------------------------------
+
+        .input("Status", sql.NVarChar(20), status || "Pending")
+
+        // ------------------------------------------------------
+        // DATABASE NAME
+        // ------------------------------------------------------
+
+        .input("DatabaseName", sql.NVarChar(100), databaseName)
+
+        // ------------------------------------------------------
+        // PROPERTY CODE
+        // ------------------------------------------------------
+
+        .input("PropertyCode", sql.NVarChar(20), propertyCode || null)
+
+        // ------------------------------------------------------
+        // ASSIGNED PROPERTY CODE
+        // ------------------------------------------------------
+
+        .input(
+          "AssignedPropertyCode",
+          sql.NVarChar(20),
+          assignedPropertyCode || null,
+        ).query(`
+        INSERT INTO MA_ChatTasks
+        (
+          TaskId,
+          TaskTitle,
+          TaskDescription,
+          AssignedBy,
+          AssignedTo,
+          StartDate,
+          DueDate,
+          Priority,
+          Status,
+          CreatedDate,
+          DatabaseName,
+          PropertyCode,
+          AssignedPropertyCode,
+          IsRead
+        )
+        VALUES
+        (
+          NEWID(),
+          @TaskTitle,
+          @TaskDescription,
+          @AssignedBy,
+          @AssignedTo,
+          @StartDate,
+          @DueDate,
+          @Priority,
+          @Status,
+          GETDATE(),
+          @DatabaseName,
+          @PropertyCode,
+          @AssignedPropertyCode,
+          0
+        )
+      `);
+
+    // ========================================================
+    // SUCCESS
+    // ========================================================
+
+    console.log("TASK INSERTED SUCCESSFULLY");
+    console.log("INSERTED ROW COUNT =", result.rowsAffected);
+
+    return res.status(200).json({
+      success: true,
+      message: "Task assigned successfully",
+    });
+  } catch (err) {
+    // ========================================================
+    // ERROR
+    // ========================================================
+
+    console.error("=================================");
+    console.error("ASSIGN TASK ERROR =", err);
+    console.error("=================================");
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 // ============================================================
-// ASSIGN TASK
+// TASK DASHBOARD
 // ============================================================
 
 app.post("/api/task-dashboard", async (req, res) => {
@@ -3203,7 +3462,6 @@ app.post("/api/task-request-read", async (req, res) => {
     });
   }
 });
-
 
 const dashboardRoutes =
 require("./routes/dashboard");
