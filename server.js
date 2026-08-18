@@ -2845,9 +2845,9 @@ app.post("/api/task-dashboard", async (req, res) => {
     console.log("viewType =", viewType);
     console.log("=================================");
 
-    // ----------------------------------------------------------
+    // ==========================================================
     // VALIDATION
-    // ----------------------------------------------------------
+    // ==========================================================
 
     if (!databaseName) {
       return res.status(400).json({
@@ -2863,52 +2863,149 @@ app.post("/api/task-dashboard", async (req, res) => {
       });
     }
 
-    // ----------------------------------------------------------
+    // ==========================================================
     // DATABASE CONNECTION
-    // ----------------------------------------------------------
+    // ==========================================================
 
     const pool = await getPool(databaseName);
 
-    // ----------------------------------------------------------
-    // TASK QUERY
-    // ----------------------------------------------------------
+    // ==========================================================
+    // GET LOGGED-IN USER'S UNQID
+    // ==========================================================
+    //
+    // userId      = SM63_5
+    // employeeId  = UNQID
+    //
+    // MA_ChatTasks.AssignedTo stores UNQID
+    //
+    // ==========================================================
+
+    const employeeResult = await pool
+      .request()
+      .input("UserId", sql.NVarChar(100), userId).query(`
+        SELECT TOP 1
+          UNQID,
+          SM63_5 AS UserId,
+          SM63_6 AS UserName
+        FROM SM63
+        WHERE SM63_5 = @UserId
+      `);
+
+    const loggedInEmployee = employeeResult.recordset[0];
+
+    console.log("LOGGED-IN EMPLOYEE =", loggedInEmployee);
+
+    if (!loggedInEmployee) {
+      return res.status(404).json({
+        success: false,
+        message: "Logged-in user not found in SM63",
+      });
+    }
+
+    const employeeUnqId = loggedInEmployee.UNQID;
+
+    console.log("LOGGED-IN USER ID =", userId);
+
+    console.log("LOGGED-IN EMPLOYEE UNQID =", employeeUnqId);
+
+    console.log("LOGGED-IN USER NAME =", loggedInEmployee.UserName);
+
+    // ==========================================================
+    // WHERE CONDITION
+    // ==========================================================
 
     let whereCondition = "";
 
+    // ----------------------------------------------------------
+    // INDIVIDUAL
+    // ----------------------------------------------------------
+    //
+    // Show tasks assigned TO logged-in employee
+    //
+    // AssignedTo contains UNQID
+    //
+    // ----------------------------------------------------------
+
     if (viewType === "Individual") {
-      // Tasks assigned TO logged-in user
       whereCondition = `
-        WHERE T.AssignedTo = @UserId
+        WHERE
+          T.AssignedTo = @EmployeeUnqId
       `;
-    } else if (viewType === "Group") {
-      // Tasks assigned BY logged-in user
-      // to other employees
-      whereCondition = `
-        WHERE T.AssignedBy = @UserId
-          AND T.AssignedTo <> @UserId
-      `;
-    } else {
-      // ALL tasks related to logged-in user
+    }
+
+    // ----------------------------------------------------------
+    // GROUP
+    // ----------------------------------------------------------
+    //
+    // Show tasks assigned BY logged-in user
+    // to other employees
+    //
+    // ----------------------------------------------------------
+    else if (viewType === "Group") {
       whereCondition = `
         WHERE
           T.AssignedBy = @UserId
-          OR
-          T.AssignedTo = @UserId
+          AND T.AssignedTo <> @EmployeeUnqId
       `;
     }
+
+    // ----------------------------------------------------------
+    // ALL
+    // ----------------------------------------------------------
+    //
+    // Show BOTH:
+    //
+    // 1. Tasks created/assigned by logged-in user
+    //
+    // OR
+    //
+    // 2. Tasks assigned to logged-in employee
+    //
+    // ----------------------------------------------------------
+    else {
+      whereCondition = `
+        WHERE
+          T.AssignedBy = @UserId
+
+          OR
+
+          T.AssignedTo = @EmployeeUnqId
+      `;
+    }
+
+    console.log("WHERE CONDITION =", whereCondition);
+
+    // ==========================================================
+    // GET TASKS
+    // ==========================================================
 
     const result = await pool
       .request()
 
-      .input("UserId", sql.NVarChar(100), userId).query(`
+      // Logged-in USER ID
+      .input("UserId", sql.NVarChar(100), userId)
 
+      // Logged-in employee UNQID
+      .input("EmployeeUnqId", sql.UniqueIdentifier, employeeUnqId).query(`
         SELECT
 
+          -- ==================================================
+          -- TASK ID
+          -- ==================================================
+
           T.TaskId,
+
+          -- ==================================================
+          -- TASK INFORMATION
+          -- ==================================================
 
           T.TaskTitle,
 
           T.TaskDescription,
+
+          -- ==================================================
+          -- ASSIGNED BY
+          -- ==================================================
 
           T.AssignedBy,
 
@@ -2917,6 +3014,10 @@ app.post("/api/task-dashboard", async (req, res) => {
             T.AssignedBy
           ) AS AssignedByName,
 
+          -- ==================================================
+          -- ASSIGNED TO
+          -- ==================================================
+
           T.AssignedTo,
 
           ISNULL(
@@ -2924,9 +3025,17 @@ app.post("/api/task-dashboard", async (req, res) => {
             T.AssignedTo
           ) AS AssignedToName,
 
+          -- ==================================================
+          -- DATES
+          -- ==================================================
+
           T.StartDate,
 
           T.DueDate,
+
+          -- ==================================================
+          -- TASK STATUS
+          -- ==================================================
 
           T.Priority,
 
@@ -2934,56 +3043,106 @@ app.post("/api/task-dashboard", async (req, res) => {
 
           T.CreatedDate,
 
+          -- ==================================================
+          -- DATABASE
+          -- ==================================================
+
           T.DatabaseName,
+
+          -- ==================================================
+          -- PROPERTY
+          -- ==================================================
 
           T.PropertyCode,
 
           T.AssignedPropertyCode,
 
+          -- ==================================================
+          -- OVERDUE
+          -- ==================================================
+
           CASE
             WHEN
-              T.Status NOT IN
-              (
+              T.Status NOT IN (
                 'Completed',
                 'Cancelled'
               )
+
               AND
+
               T.DueDate IS NOT NULL
+
               AND
-              CAST(T.DueDate AS DATE) < CAST(GETDATE() AS DATE)
+
+              CAST(T.DueDate AS DATE)
+              <
+              CAST(GETDATE() AS DATE)
+
             THEN 1
+
             ELSE 0
+
           END AS IsOverdue
 
         FROM MA_ChatTasks T
 
-       LEFT JOIN SM63 AB
-  ON AB.SM63_5 = T.AssignedBy
+        -- ====================================================
+        -- ASSIGNED BY USER
+        -- ====================================================
 
-LEFT JOIN SM63 AT
-  ON AT.UNQID = T.AssignedTo
+        LEFT JOIN SM63 AB
+          ON AB.SM63_5 = T.AssignedBy
+
+        -- ====================================================
+        -- ASSIGNED TO EMPLOYEE
+        -- ====================================================
+
+        LEFT JOIN SM63 AT
+          ON AT.UNQID = T.AssignedTo
+
+        -- ====================================================
+        -- FILTER
+        -- ====================================================
 
         ${whereCondition}
 
+        -- ====================================================
+        -- ORDER
+        -- ====================================================
+
         ORDER BY
+
           CASE
-            WHEN T.Status = 'Pending' THEN 1
-            WHEN T.Status = 'In Progress' THEN 2
-            WHEN T.Status = 'Completed' THEN 3
-            ELSE 4
+            WHEN T.Status = 'Pending'
+              THEN 1
+
+            WHEN T.Status = 'In Progress'
+              THEN 2
+
+            WHEN T.Status = 'Completed'
+              THEN 3
+
+            WHEN T.Status = 'Cancelled'
+              THEN 4
+
+            ELSE 5
+
           END,
 
           T.DueDate ASC,
 
           T.CreatedDate DESC
-
       `);
 
-    // ----------------------------------------------------------
-    // SUMMARY
-    // ----------------------------------------------------------
+    // ==========================================================
+    // TASK DATA
+    // ==========================================================
 
     const tasks = result.recordset;
+
+    // ==========================================================
+    // SUMMARY
+    // ==========================================================
 
     const total = tasks.length;
 
@@ -3005,19 +3164,36 @@ LEFT JOIN SM63 AT
 
     const overdue = tasks.filter((x) => Number(x.IsOverdue) === 1).length;
 
-    console.log("TASK COUNT =", total);
+    // ==========================================================
+    // LOG SUMMARY
+    // ==========================================================
+
+    console.log("=================================");
+    console.log("TASK DASHBOARD RESULT");
+    console.log("USER ID =", userId);
+    console.log("EMPLOYEE UNQID =", employeeUnqId);
+    console.log("USER NAME =", loggedInEmployee.UserName);
+    console.log("---------------------------------");
+    console.log("TOTAL =", total);
     console.log("PENDING =", pending);
     console.log("IN PROGRESS =", inProgress);
     console.log("COMPLETED =", completed);
     console.log("CANCELLED =", cancelled);
     console.log("OVERDUE =", overdue);
+    console.log("=================================");
 
-    // ----------------------------------------------------------
+    // ==========================================================
     // RESPONSE
-    // ----------------------------------------------------------
+    // ==========================================================
 
     return res.status(200).json({
       success: true,
+
+      loggedInUser: {
+        userId: userId,
+        employeeUnqId: employeeUnqId,
+        userName: loggedInEmployee.UserName,
+      },
 
       summary: {
         total: total,
@@ -3031,6 +3207,10 @@ LEFT JOIN SM63 AT
       data: tasks,
     });
   } catch (err) {
+    // ==========================================================
+    // ERROR
+    // ==========================================================
+
     console.error("=================================");
     console.error("TASK DASHBOARD ERROR");
     console.error(err);
