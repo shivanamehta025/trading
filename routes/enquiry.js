@@ -380,7 +380,7 @@ router.post('/enquiry-admin-rate-save', async (req, res) => {
 
 router.post('/enquiry-in-out-time', async (req, res) => {
     try {
-        const { databaseName, unq, e_3, intime, outtime, e_8 } = req.body;
+        const { databaseName, unq, e_3, intime, outtime, e_8, e_16, e_17 } = req.body;
         const pool = await getPool(databaseName);
 
         const result = await pool.request()
@@ -390,11 +390,11 @@ router.post('/enquiry-in-out-time', async (req, res) => {
             .input('intime', sql.NVarChar(50), intime || '')
             .input('outtime', sql.NVarChar(50), outtime || '')
             .input('e_8', sql.NVarChar(50), e_8)
+            .input('e_16', sql.NVarChar(100), e_16 || '')
+            .input('e_17', sql.NVarChar(100), e_17 || '')
 
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
 
-        // 'insinouttime' me 2 SELECTs hain jab intime save ho ('' msg + PUNQID) -
-        // isliye recordsets array dekhna padega
         const recordsets = result.recordsets || [];
         let punqid = '';
         let msg = '';
