@@ -15,17 +15,35 @@ router.post('/freight-enquiry-masters', async (req, res) => {
         const pool = await getPool(databaseName);
 
         const result = await pool.request()
-            .input('WHAT', sql.NVarChar, 'GET_MASTERS')
-            .input('TRANSPORTERUNQID', sql.NVarChar, null)
+            .input(
+                'WHAT',
+                sql.NVarChar,
+                'GET_MASTERS'
+            )
+            .input(
+                'TRANSPORTERUNQID',
+                sql.NVarChar,
+                null
+            )
             .execute('A_SP_FOR_FREIGHT_ENQUIRY');
 
         res.json({
             success: true,
 
-            cities: result.recordsets[0],
-            customers: result.recordsets[1],
-            products: result.recordsets[2],
-            transporters: result.recordsets[3],
+            // 1
+            cities: result.recordsets[0] || [],
+
+            // 2
+            customers: result.recordsets[1] || [],
+
+            // 3
+            products: result.recordsets[2] || [],
+
+            // 4
+            transporters: result.recordsets[3] || [],
+
+            // 5 - PO TABLE
+            purchaseOrders: result.recordsets[4] || [],
         });
 
     } catch (error) {
@@ -41,7 +59,6 @@ router.post('/freight-enquiry-masters', async (req, res) => {
         });
     }
 });
-
 router.post('/freight-enquiry-vehicles', async (req, res) => {
     try {
 
@@ -85,7 +102,7 @@ router.post('/freight-enquiry-vehicles', async (req, res) => {
     }
 });
 
-router.post('/freight-enquiry-by-po', async (req, res) => {
+router.post('/freight-enquiry-by-po', async (req, res) => {R
     try {
 
         const {
