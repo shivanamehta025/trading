@@ -92,6 +92,62 @@ app.post("/api/login", async (req, res) => {
     });
   }
 });
+app.post("/api/user-level", async (req, res) => {
+  try {
+    const { databaseName, userId } = req.body;
+
+    console.log("========== USER LEVEL ==========");
+    console.log("databaseName =", databaseName);
+    console.log("userId =", userId);
+
+    if (!databaseName || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and userId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request().input("userId", sql.VarChar, userId)
+      .query(`
+        SELECT TOP 1
+          s63.SM63_5 AS UserID,
+          s63.SM63_6 AS UserName,
+          s61.SM61_6 AS Designation,
+          s61.SM61_9 AS Level
+        FROM SM63 AS s63
+        INNER JOIN SM61 AS s61
+          ON s61.UNQID = s63.SM63_8
+        WHERE s63.SM63_5 = @userId
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User level not found",
+      });
+    }
+
+    const user = result.recordset[0];
+
+    console.log("LEVEL FOUND =", user.Level);
+    console.log("DESIGNATION =", user.Designation);
+
+    return res.json({
+      success: true,
+      level: user.Level,
+      designation: user.Designation,
+    });
+  } catch (err) {
+    console.log("USER LEVEL ERROR =", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 
 app.post("/api/branches", async (req, res) => {
   try {
