@@ -3228,16 +3228,30 @@ app.post("/api/task-dashboard", async (req, res) => {
 // UPDATE TASK STATUS
 // ============================================================
 
+// ============================================================
+// UPDATE TASK STATUS + NOTIFY ASSIGNER
+// ============================================================
+
 app.post("/api/update-task-status", async (req, res) => {
   try {
-    const { databaseName, taskId, status } = req.body;
+    const {
+      databaseName,
+      taskId,
+      status,
+      changedBy,
+    } = req.body;
 
     console.log("=================================");
     console.log("UPDATE TASK STATUS");
     console.log("databaseName =", databaseName);
     console.log("taskId =", taskId);
     console.log("status =", status);
+    console.log("changedBy =", changedBy);
     console.log("=================================");
+
+    // ----------------------------------------------------------
+    // VALIDATION
+    // ----------------------------------------------------------
 
     if (!databaseName) {
       return res.status(400).json({
@@ -3276,34 +3290,215 @@ app.post("/api/update-task-status", async (req, res) => {
 
     const pool = await getPool(databaseName);
 
-    const result = await pool
+    // ----------------------------------------------------------
+    // GET TASK DETAILS BEFORE UPDATE
+    // ----------------------------------------------------------
+
+    const taskResult = await pool
       .request()
-
       .input("TaskId", sql.UniqueIdentifier, taskId)
+      .query(`
+        SELECT TOP 1
+          T.TaskId,
+          T.TaskTitle,
+          T.AssignedBy,
+          T.AssignedTo,
+          T.Status AS OldStatus,
+          T.DatabaseName,
 
-      .input("Status", sql.NVarChar(20), status).query(`
+          ISNULL(AB.SM63_6, T.AssignedBy) AS AssignedByName,
+          ISNULL(AT.SM63_6, T.AssignedTo) AS AssignedToName
 
-        UPDATE MA_ChatTasks
+        FROM MA_ChatTasks T
 
-        SET Status = @Status
+        LEFT JOIN SM63 AB
+          ON AB.SM63_5 = T.AssignedBy
 
-        WHERE TaskId = @TaskId
+        LEFT JOIN SM63 AT
+          ON AT.UNQID = T.AssignedTo
 
+        WHERE T.TaskId = @TaskId
       `);
 
-    if (result.rowsAffected[0] === 0) {
+    if (taskResult.recordset.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Task not found",
       });
     }
 
+    const task = taskResult.recordset[0];
+
+    const assignedBy = task.AssignedBy;
+    const assignedTo = task.AssignedTo;
+    const taskTitle = task.TaskTitle;
+    const oldStatus = task.OldStatus;
+    const assignedToName = task.AssignedToName;
+
+    console.log("TASK FOUND");
+    console.log("Assigned By =", assignedBy);
+    console.log("Assigned To =", assignedTo);
+    console.log("Task Title =", taskTitle);
+    console.log("Old Status =", oldStatus);
+    console.log("New Status =", status);
+
+    // ----------------------------------------------------------
+    // NOTHING CHANGED
+    // ----------------------------------------------------------
+
+    if (oldStatus === status) {
+      return res.json({
+        success: true,
+        message: "Task status is already " + status,
+      });
+    }
+
+    // ----------------------------------------------------------
+    // UPDATE TASK
+    // ----------------------------------------------------------
+
+    const updateResult = await pool
+      .request()
+      .input("TaskId", sql.UniqueIdentifier, taskId)
+      .input("Status", sql.NVarChar(20), status)
+      .query(`
+        UPDATE MA_ChatTasks
+        SET Status = @Status
+        WHERE TaskId = @TaskId
+      `);
+
+    if (updateResult.rowsAffected[0] === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Task update failed",
+      });
+    }
+
+    // ----------------------------------------------------------
+    // DO NOT NOTIFY USER IF SAME USER UPDATED OWN TASK
+    // ----------------------------------------------------------
+
+    if (assignedBy === changedBy) {
+      return res.json({
+        success: true,
+        message: "Task status updated successfully",
+      });
+    }
+
+    // ----------------------------------------------------------
+    // NOTIFICATION MESSAGE
+    // ----------------------------------------------------------
+
+    const notificationTitle = "Task Status Updated";
+
+    const notificationMessage =
+      `${assignedToName} changed "${taskTitle}" status ` +
+      `from ${oldStatus} to ${status}.`;
+
+    console.log("NOTIFICATION USER =", assignedBy);
+    console.log("NOTIFICATION MESSAGE =", notificationMessage);
+
+    // ----------------------------------------------------------
+    // SAVE NOTIFICATION IN APP_NOTIFICATION
+    // ----------------------------------------------------------
+
+    await pool
+      .request()
+      .input("USERID", sql.VarChar, assignedBy)
+      .input("TITLE", sql.VarChar, notificationTitle)
+      .input("MESSAGE", sql.NVarChar, notificationMessage)
+      .input("REFERENCEID", sql.VarChar, taskId)
+      .input("DATABASENAME", sql.VarChar, databaseName)
+      .query(`
+        INSERT INTO APP_NOTIFICATION
+        (
+          USERID,
+          TITLE,
+          MESSAGE,
+          REFERENCEID,
+          DATABASENAME,
+          ISREAD,
+          CREATEDON
+        )
+        VALUES
+        (
+          @USERID,
+          @TITLE,
+          @MESSAGE,
+          @REFERENCEID,
+          @DATABASENAME,
+          0,
+          GETDATE()
+        )
+      `);
+
+    console.log("APP NOTIFICATION SAVED");
+
+    // ----------------------------------------------------------
+    // SEND FCM PUSH NOTIFICATION
+    // ----------------------------------------------------------
+
+    try {
+      const companyPool = await getPool();
+
+      const tokenResult = await companyPool
+        .request()
+        .input("userId", sql.VarChar, assignedBy)
+        .query(`
+          SELECT DEVICETOKEN
+          FROM APP_DEVICE_TOKEN
+          WHERE USERID = @userId
+        `);
+
+      console.log(
+        "ASSIGNER DEVICE TOKENS =",
+        tokenResult.recordset.length
+      );
+
+      for (const row of tokenResult.recordset) {
+        if (row.DEVICETOKEN) {
+          await sendNotification(
+            row.DEVICETOKEN,
+            notificationTitle,
+            notificationMessage,
+            {
+              type: "TASK_STATUS",
+              taskId: taskId,
+              databaseName: databaseName,
+              status: status,
+            }
+          );
+        }
+      }
+
+      console.log("FCM TASK STATUS NOTIFICATION SENT");
+
+    } catch (notificationError) {
+      // Notification failure should NOT make task update fail
+      console.error(
+        "TASK FCM NOTIFICATION ERROR =",
+        notificationError
+      );
+    }
+
+    // ----------------------------------------------------------
+    // RESPONSE
+    // ----------------------------------------------------------
+
     return res.json({
       success: true,
       message: "Task status updated successfully",
+      taskId: taskId,
+      oldStatus: oldStatus,
+      newStatus: status,
+      notifiedUser: assignedBy,
     });
+
   } catch (err) {
+
+    console.error("=================================");
     console.error("UPDATE TASK STATUS ERROR =", err);
+    console.error("=================================");
 
     return res.status(500).json({
       success: false,
