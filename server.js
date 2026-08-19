@@ -36,18 +36,17 @@ app.get("/ping", (_, res) => {
 });
 
 
-app.post('/api/login', async (req, res) => {
 
-    try {
+app.post("/api/login", async (req, res) => {
+  try {
+    const { userId, password } = req.body;
 
-        const { userId, password } = req.body;
+    const pool = await getPool();
 
-        const pool = await getPool();
-
-        const result = await pool.request()
-            .input('userId', sql.VarChar, userId)
-            .input('password', sql.VarChar, password)
-            .query(`
+    const result = await pool
+      .request()
+      .input("userId", sql.VarChar, userId)
+      .input("password", sql.VarChar, password).query(`
                 SELECT *
                 FROM SM63
                 INNER JOIN SM61
@@ -56,49 +55,42 @@ app.post('/api/login', async (req, res) => {
                   AND SM63_7 = @password
             `);
 
-        if (result.recordset.length === 0) {
-
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid UserID or Password'
-            });
-
-        }
-
-        // First row contains common user information
-        const firstRow = result.recordset[0];
-
-        // Build company list
-        const companies = result.recordset.map(row => ({
-            companyCode: row.SM63_14,
-            databaseName: row.SM63_15,
-        }));
-
-        return res.json({
-
-            success: true,
-
-            user: {
-                sm63_5: firstRow.sm63_5,
-                sm63_6: firstRow.sm63_6,
-                sm61_6: firstRow.sm61_6,
-            },
-
-            companies: companies,
-
-        });
-
-    } catch (err) {
-
-        console.log(err);
-
-        res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
+    if (result.recordset.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid UserID or Password",
+      });
     }
 
+    // First row contains common user information
+    const firstRow = result.recordset[0];
+
+    // Build company list
+    const companies = result.recordset.map((row) => ({
+      companyCode: row.SM63_14,
+      databaseName: row.SM63_15,
+    }));
+
+    return res.json({
+      success: true,
+
+      user: {
+        sm63_5: firstRow.sm63_5,
+        sm63_6: firstRow.sm63_6,
+        sm61_6: firstRow.sm61_6,
+        sm61_9: firstRow.sm61_9,
+      },
+
+      companies: companies,
+    });
+  } catch (err) {
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
 });
 
 app.post("/api/branches", async (req, res) => {
