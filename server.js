@@ -3758,6 +3758,11 @@ const enquiry =
 require("./routes/enquiry");
 app.use("/api", enquiry);
 
+const freightenq =
+require("./routes/freightenq");
+app.use("/api", freightenq);
+
+
 
 
 
