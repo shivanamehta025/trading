@@ -36,64 +36,69 @@ app.get("/ping", (_, res) => {
 });
 
 
-app.post("/api/login", async (req, res) => {
-  try {
-    const { userId, password } = req.body;
+app.post('/api/login', async (req, res) => {
 
-    const pool = await getPool();
+    try {
 
-    const result = await pool
-      .request()
-      .input("userId", sql.VarChar, userId)
-      .input("password", sql.VarChar, password).query(`
-    SELECT
-        SM63.*,
-        SM61.SM61_6,
-        SM61.SM61_9 AS CompanyLevel
-    FROM SM63
-    INNER JOIN SM61
-        ON SM61.UNQID = SM63_8
-    WHERE SM63_5 = @userId
-      AND SM63_7 = @password
-`);
+        const { userId, password } = req.body;
 
-    if (result.recordset.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid UserID or Password",
-      });
+        const pool = await getPool();
+
+        const result = await pool.request()
+            .input('userId', sql.VarChar, userId)
+            .input('password', sql.VarChar, password)
+            .query(`
+                SELECT *
+                FROM SM63
+                INNER JOIN SM61
+                    ON SM61.UNQID = SM63_8
+                WHERE SM63_5 = @userId
+                  AND SM63_7 = @password
+            `);
+
+        if (result.recordset.length === 0) {
+
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid UserID or Password'
+            });
+
+        }
+
+        // First row contains common user information
+        const firstRow = result.recordset[0];
+
+        // Build company list
+        const companies = result.recordset.map(row => ({
+            companyCode: row.SM63_14,
+            databaseName: row.SM63_15,
+        }));
+
+        return res.json({
+
+            success: true,
+
+            user: {
+                sm63_5: firstRow.sm63_5,
+                sm63_6: firstRow.sm63_6,
+                sm61_6: firstRow.sm61_6,
+            },
+
+            companies: companies,
+
+        });
+
+    } catch (err) {
+
+        console.log(err);
+
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+
     }
 
-    // First row contains common user information
-    const firstRow = result.recordset[0];
-
-    // Build company list
-    const companies = result.recordset.map((row) => ({
-      companyCode: row.SM63_14,
-      databaseName: row.SM63_15,
-      level: row.CompanyLevel,
-    }));
-
-    return res.json({
-      success: true,
-
-      user: {
-        sm63_5: firstRow.sm63_5,
-        sm63_6: firstRow.sm63_6,
-        sm61_6: firstRow.sm61_6,
-        sm61_9: firstRow.sm61_9,
-      },
-
-      companies: companies,
-    });
-  } catch (err) {
-    console.log(err);
-
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
 });
 
 app.post("/api/branches", async (req, res) => {
