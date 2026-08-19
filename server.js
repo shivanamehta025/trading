@@ -2168,8 +2168,23 @@ app.post("/api/all-users", async (req, res) => {
                 ','
             )
         )
-        AND TRY_CONVERT(INT, s61.SM61_9) > @level
-        ORDER BY s63.SM63_6
+            AND
+(
+    CASE
+        WHEN @level = (SELECT MAX(TRY_CONVERT(INT, SM61_9)) FROM SM61)
+            THEN
+                CASE
+                    WHEN TRY_CONVERT(INT, s61.SM61_9) > @level THEN 1
+                    ELSE 0
+                END
+        ELSE
+            CASE
+                WHEN TRY_CONVERT(INT, s61.SM61_9) >= @level THEN 1
+                ELSE 0
+            END
+    END
+) = 1
+ORDER BY s63.SM63_6;
       `);
 
     console.log("ALL USERS RESULT =", result.recordset);
