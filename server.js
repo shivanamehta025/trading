@@ -2147,25 +2147,29 @@ app.post("/api/all-users", async (req, res) => {
     const result = await pool
       .request()
       .input("userid", sql.VarChar, userId)
-      .input("level", sql.Int, level).query(`
-        SELECT 
-            UNQID AS data,
-            SM63_6 AS value
-        FROM SM63 inner join sm61 on sm61.unqid=sm63_8 order by sm61.sm61_6
-        WHERE SM63_12 IN
+      .input("level", sql.Int, Number(level))
+      .query(`
+        SELECT
+            s63.UNQID AS data,
+            s63.SM63_6 AS value
+        FROM SM63 AS s63
+        INNER JOIN SM61 AS s61
+            ON s61.UNQID = s63.SM63_8
+        WHERE s63.SM63_12 IN
         (
             SELECT data
-            FROM dbo.split(
+            FROM dbo.split
+            (
                 (
                     SELECT SM63_12
                     FROM SM63
-                    WHERE SM63_5 = @userid 
+                    WHERE SM63_5 = @userid
                 ),
                 ','
-            ) 
-                and sm61_9 > @level
+            )
         )
-        ORDER BY SM63_6
+        AND TRY_CONVERT(INT, s61.SM61_9) > @level
+        ORDER BY s63.SM63_6
       `);
 
     console.log("ALL USERS RESULT =", result.recordset);
@@ -2174,6 +2178,7 @@ app.post("/api/all-users", async (req, res) => {
       success: true,
       data: result.recordset,
     });
+
   } catch (err) {
     console.log("ALL USERS ERROR =", err);
 
