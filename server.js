@@ -2115,7 +2115,7 @@ app.post("/api/all-users", async (req, res) => {
                 ),
                 ','
             ) 
-                and sm61_9 >@level
+                and sm61_9 > @level
         )
         ORDER BY SM63_6
       `);
