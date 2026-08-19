@@ -124,7 +124,7 @@ router.post('/freight-enquiry-by-po', async (req, res) => {R
                 poUnqid
             )
             .execute(
-                'A_SP_FOR_FREIGHT_ENQUIRY_APP'
+                'A_SP_FOR_FREIGHT_ENQUIRY'
             );
 
         res.json({
