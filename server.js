@@ -3212,10 +3212,10 @@ app.post("/api/task-dashboard", async (req, res) => {
 
           T.AssignedTo,
 
-          ISNULL(
-            AT.SM63_6,
-            T.AssignedTo
-          ) AS AssignedToName,
+         ISNULL(
+    AT.SM63_6,
+    CAST(T.AssignedTo AS NVARCHAR(100))
+) AS AssignedToName,
 
           -- ==================================================
           -- DATES
@@ -3414,22 +3414,11 @@ app.post("/api/task-dashboard", async (req, res) => {
     });
   }
 });
-// ============================================================
-// UPDATE TASK STATUS
-// ============================================================
 
-// ============================================================
-// UPDATE TASK STATUS + NOTIFY ASSIGNER
-// ============================================================
 
 app.post("/api/update-task-status", async (req, res) => {
   try {
-    const {
-      databaseName,
-      taskId,
-      status,
-      changedBy,
-    } = req.body;
+    const { databaseName, taskId, status, changedBy } = req.body;
 
     console.log("=================================");
     console.log("UPDATE TASK STATUS");
@@ -3486,8 +3475,7 @@ app.post("/api/update-task-status", async (req, res) => {
 
     const taskResult = await pool
       .request()
-      .input("TaskId", sql.UniqueIdentifier, taskId)
-      .query(`
+      .input("TaskId", sql.UniqueIdentifier, taskId).query(`
         SELECT TOP 1
           T.TaskId,
           T.TaskTitle,
@@ -3496,8 +3484,11 @@ app.post("/api/update-task-status", async (req, res) => {
           T.Status AS OldStatus,
           T.DatabaseName,
 
-          ISNULL(AB.SM63_6, T.AssignedBy) AS AssignedByName,
-          ISNULL(AT.SM63_6, T.AssignedTo) AS AssignedToName
+   ISNULL(AB.SM63_6, T.AssignedBy) AS AssignedByName,
+ISNULL(
+    AT.SM63_6,
+    CAST(T.AssignedTo AS NVARCHAR(100))
+) AS AssignedToName
 
         FROM MA_ChatTasks T
 
@@ -3550,8 +3541,7 @@ app.post("/api/update-task-status", async (req, res) => {
     const updateResult = await pool
       .request()
       .input("TaskId", sql.UniqueIdentifier, taskId)
-      .input("Status", sql.NVarChar(20), status)
-      .query(`
+      .input("Status", sql.NVarChar(20), status).query(`
         UPDATE MA_ChatTasks
         SET Status = @Status
         WHERE TaskId = @TaskId
@@ -3598,8 +3588,7 @@ app.post("/api/update-task-status", async (req, res) => {
       .input("TITLE", sql.VarChar, notificationTitle)
       .input("MESSAGE", sql.NVarChar, notificationMessage)
       .input("REFERENCEID", sql.VarChar, taskId)
-      .input("DATABASENAME", sql.VarChar, databaseName)
-      .query(`
+      .input("DATABASENAME", sql.VarChar, databaseName).query(`
         INSERT INTO APP_NOTIFICATION
         (
           USERID,
@@ -3633,17 +3622,13 @@ app.post("/api/update-task-status", async (req, res) => {
 
       const tokenResult = await companyPool
         .request()
-        .input("userId", sql.VarChar, assignedBy)
-        .query(`
+        .input("userId", sql.VarChar, assignedBy).query(`
           SELECT DEVICETOKEN
           FROM APP_DEVICE_TOKEN
           WHERE USERID = @userId
         `);
 
-      console.log(
-        "ASSIGNER DEVICE TOKENS =",
-        tokenResult.recordset.length
-      );
+      console.log("ASSIGNER DEVICE TOKENS =", tokenResult.recordset.length);
 
       for (const row of tokenResult.recordset) {
         if (row.DEVICETOKEN) {
@@ -3656,19 +3641,15 @@ app.post("/api/update-task-status", async (req, res) => {
               taskId: taskId,
               databaseName: databaseName,
               status: status,
-            }
+            },
           );
         }
       }
 
       console.log("FCM TASK STATUS NOTIFICATION SENT");
-
     } catch (notificationError) {
       // Notification failure should NOT make task update fail
-      console.error(
-        "TASK FCM NOTIFICATION ERROR =",
-        notificationError
-      );
+      console.error("TASK FCM NOTIFICATION ERROR =", notificationError);
     }
 
     // ----------------------------------------------------------
@@ -3683,9 +3664,7 @@ app.post("/api/update-task-status", async (req, res) => {
       newStatus: status,
       notifiedUser: assignedBy,
     });
-
   } catch (err) {
-
     console.error("=================================");
     console.error("UPDATE TASK STATUS ERROR =", err);
     console.error("=================================");
