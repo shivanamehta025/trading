@@ -241,5 +241,202 @@ router.post('/freight-enquiry-by-po', async (req, res) => {
 
 });
 
+router.post('/save-freight-enquiry', async (req, res) => {
+
+    try {
+
+        const {
+            databaseName,
+            userId,
+
+            poUnqid,
+            pono,
+
+            fromCity,
+            toCity,
+
+            product,
+            customer,
+
+            quantity,
+
+            transporter,
+            vehicle,
+            vehicleType,
+
+            driverName,
+            driverMobile,
+
+            freight
+        } = req.body;
+
+
+        console.log(
+            '========== SAVE FREIGHT ENQUIRY =========='
+        );
+
+        console.log('DATABASE:', databaseName);
+        console.log('USER:', userId);
+        console.log('PO:', poUnqid);
+        console.log('FROM:', fromCity);
+        console.log('TO:', toCity);
+        console.log('PRODUCT:', product);
+        console.log('CUSTOMER:', customer);
+        console.log('QUANTITY:', quantity);
+        console.log('TRANSPORTER:', transporter);
+        console.log('VEHICLE:', vehicle);
+        console.log('VEHICLE TYPE:', vehicleType);
+        console.log('DRIVER:', driverName);
+        console.log('DRIVER MOBILE:', driverMobile);
+        console.log('FREIGHT:', freight);
+
+
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: 'databaseName is required'
+            });
+        }
+
+
+        const pool =
+            await getPool(databaseName);
+
+
+        const result =
+            await pool.request()
+
+                .input(
+                    'WHAT',
+                    sql.NVarChar(50),
+                    'SAVE_ENQUIRY'
+                )
+
+                .input(
+                    'TRANSPORTERUNQID',
+                    sql.NVarChar(100),
+                    null
+                )
+
+                .input(
+                    'POUNQID',
+                    sql.UniqueIdentifier,
+                    poUnqid
+                )
+
+                .input(
+                    'PONO',
+                    sql.NVarChar(50),
+                    pono
+                )
+
+                .input(
+                    'FROMCITY',
+                    sql.UniqueIdentifier,
+                    fromCity
+                )
+
+                .input(
+                    'TOCITY',
+                    sql.UniqueIdentifier,
+                    toCity
+                )
+
+                .input(
+                    'PRODUCT',
+                    sql.UniqueIdentifier,
+                    product
+                )
+
+                .input(
+                    'CUSTOMER',
+                    sql.UniqueIdentifier,
+                    customer
+                )
+
+                .input(
+                    'QUANTITY',
+                    sql.Decimal(18, 3),
+                    quantity
+                )
+
+                .input(
+                    'TRANSPORTER',
+                    sql.UniqueIdentifier,
+                    transporter
+                )
+
+                .input(
+                    'VEHICLE',
+                    sql.UniqueIdentifier,
+                    vehicle
+                )
+
+                .input(
+                    'VEHICLETYPE',
+                    sql.UniqueIdentifier,
+                    vehicleType
+                )
+
+                .input(
+                    'DRIVERNAME',
+                    sql.NVarChar(100),
+                    driverName
+                )
+
+                .input(
+                    'DRIVERMOBILE',
+                    sql.NVarChar(20),
+                    driverMobile
+                )
+
+                .input(
+                    'FREIGHT',
+                    sql.Decimal(18, 2),
+                    freight
+                )
+
+                .input(
+                    'CREATEDBY',
+                    sql.NVarChar(50),
+                    userId
+                )
+
+                .execute(
+                    'A_SP_FOR_FREIGHT_ENQUIRY'
+                );
+
+
+        const record =
+            result.recordset?.[0];
+
+
+        res.json({
+            success: true,
+
+            message:
+                'Freight enquiry saved successfully',
+
+            data: record || null
+        });
+
+
+    } catch (error) {
+
+        console.error(
+            'SAVE FREIGHT ENQUIRY ERROR:',
+            error
+        );
+
+        res.status(500).json({
+
+            success: false,
+
+            message: error.message
+        });
+    }
+
+});
+
 
 module.exports = router;
