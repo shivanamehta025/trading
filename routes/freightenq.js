@@ -102,7 +102,8 @@ router.post('/freight-enquiry-vehicles', async (req, res) => {
     }
 });
 
-router.post('/freight-enquiry-by-po', async (req, res) => {R
+router.post('/freight-enquiry-by-po', async (req, res) => {
+
     try {
 
         const {
@@ -110,37 +111,132 @@ router.post('/freight-enquiry-by-po', async (req, res) => {R
             poUnqid
         } = req.body;
 
-        const pool = await getPool(databaseName);
+        console.log(
+            '======================================'
+        );
 
-        const result = await pool.request()
-            .input(
-                'what',
-                sql.NVarChar(50),
-                'GET_PO_DETAILS'
-            )
-            .input(
-                'pounqid',
-                sql.NVarChar(50),
-                poUnqid
-            )
-            .execute(
-                'A_SP_FOR_FREIGHT_ENQUIRY'
-            );
+        console.log(
+            'FREIGHT PO DETAILS API'
+        );
+
+        console.log(
+            'DATABASE:',
+            databaseName
+        );
+
+        console.log(
+            'POUNQID:',
+            poUnqid
+        );
+
+        console.log(
+            '======================================'
+        );
+
+
+        if (!databaseName) {
+
+            return res.status(400).json({
+                success: false,
+                message: 'databaseName is required'
+            });
+
+        }
+
+
+        if (!poUnqid) {
+
+            return res.status(400).json({
+                success: false,
+                message: 'poUnqid is required'
+            });
+
+        }
+
+
+        const pool =
+            await getPool(databaseName);
+
+
+        const result =
+            await pool.request()
+
+                .input(
+                    'WHAT',
+                    sql.NVarChar(50),
+                    'GET_PO_DETAILS'
+                )
+
+                .input(
+                    'TRANSPORTERUNQID',
+                    sql.NVarChar(100),
+                    null
+                )
+
+                .input(
+                    'POUNQID',
+                    sql.NVarChar(100),
+                    poUnqid
+                )
+
+                .execute(
+                    'A_SP_FOR_FREIGHT_ENQUIRY'
+                );
+
+
+        console.log(
+            'PO RECORDSETS:',
+            result.recordsets
+        );
+
 
         res.json({
+
             success: true,
-            data: result.recordset?.[0] ?? {}
+
+            data:
+                result.recordset &&
+                result.recordset.length > 0
+                    ? result.recordset[0]
+                    : null
+
         });
 
-    } catch (err) {
+    } catch (error) {
 
-        console.error(err);
+        console.error(
+            '======================================'
+        );
+
+        console.error(
+            'FREIGHT PO API ERROR'
+        );
+
+        console.error(
+            error
+        );
+
+        console.error(
+            '======================================'
+        );
+
 
         res.status(500).json({
+
             success: false,
-            message: err.message
+
+            message:
+                error.message,
+
+            error:
+                error.originalError
+                    ?.message ||
+                null
+
         });
+
     }
+
 });
 
 
