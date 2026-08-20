@@ -438,5 +438,42 @@ router.post('/save-freight-enquiry', async (req, res) => {
 
 });
 
+router.post('/freight-enquiry-next-no', async (req, res) => {
+
+    try {
+
+        const { databaseName } = req.body;
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input(
+                'WHAT',
+                sql.NVarChar(50),
+                'GET_NEXT_ENQUIRY_NO'
+            )
+            .execute(
+                'A_SP_FOR_FREIGHT_ENQUIRY'
+            );
+
+        res.json({
+            success: true,
+            data: result.recordset?.[0] || null
+        });
+
+    } catch (error) {
+
+        console.error(
+            'NEXT FREIGHT ENQUIRY ERROR:',
+            error
+        );
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 
 module.exports = router;
