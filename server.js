@@ -3026,6 +3026,382 @@ app.post("/api/assign-task", async (req, res) => {
 // TASK DASHBOARD
 // ============================================================
 
+// ============================================================
+// TASK DASHBOARD
+// ============================================================
+
+app.post("/api/task-dashboard", async (req, res) => {
+  try {
+    const { databaseName, userId, viewType = "All" } = req.body;
+
+    console.log("=================================");
+    console.log("TASK DASHBOARD API");
+    console.log("databaseName =", databaseName);
+    console.log("userId =", userId);
+    console.log("viewType =", viewType);
+    console.log("=================================");
+
+    // ==========================================================
+    // VALIDATION
+    // ==========================================================
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    // ==========================================================
+    // DATABASE CONNECTION
+    // ==========================================================
+
+    const pool = await getPool(databaseName);
+
+    // ==========================================================
+    // GET LOGGED-IN EMPLOYEE
+    // ==========================================================
+
+    const employeeResult = await pool
+      .request()
+      .input("UserId", sql.NVarChar(100), String(userId)).query(`
+        SELECT TOP 1
+          UNQID,
+          SM63_5 AS UserId,
+          SM63_6 AS UserName
+        FROM SM63
+        WHERE SM63_5 = @UserId
+      `);
+
+    const loggedInEmployee = employeeResult.recordset[0];
+
+    console.log("LOGGED-IN EMPLOYEE =", loggedInEmployee);
+
+    if (!loggedInEmployee) {
+      return res.status(404).json({
+        success: false,
+        message: "Logged-in user not found in SM63",
+      });
+    }
+
+    // ==========================================================
+    // IMPORTANT
+    //
+    // SM63.UNQID = uniqueidentifier
+    // MA_ChatTasks.AssignedTo = nvarchar
+    //
+    // Therefore convert UNQID to string.
+    // ==========================================================
+
+    const employeeUnqId = String(loggedInEmployee.UNQID);
+
+    console.log("LOGGED-IN USER ID =", userId);
+
+    console.log("LOGGED-IN EMPLOYEE UNQID =", employeeUnqId);
+
+    console.log("LOGGED-IN USER NAME =", loggedInEmployee.UserName);
+
+    // ==========================================================
+    // WHERE CONDITION
+    // ==========================================================
+
+    let whereCondition = "";
+
+    // ----------------------------------------------------------
+    // INDIVIDUAL
+    // ----------------------------------------------------------
+
+    if (viewType === "Individual") {
+      whereCondition = `
+        WHERE
+          T.AssignedTo = @EmployeeUnqId
+      `;
+    }
+
+    // ----------------------------------------------------------
+    // GROUP
+    // ----------------------------------------------------------
+    else if (viewType === "Group") {
+      whereCondition = `
+        WHERE
+          T.AssignedBy = @UserId
+          AND T.AssignedTo <> @EmployeeUnqId
+      `;
+    }
+
+    // ----------------------------------------------------------
+    // ALL
+    // ----------------------------------------------------------
+    else {
+      whereCondition = `
+        WHERE
+          T.AssignedBy = @UserId
+
+          OR
+
+          T.AssignedTo = @EmployeeUnqId
+      `;
+    }
+
+    console.log("WHERE CONDITION =", whereCondition);
+
+    // ==========================================================
+    // GET TASKS
+    // ==========================================================
+
+    const result = await pool
+      .request()
+
+      // USER ID
+      .input("UserId", sql.NVarChar(100), String(userId))
+
+      // IMPORTANT:
+      // AssignedTo is NVARCHAR in MA_ChatTasks
+      .input("EmployeeUnqId", sql.NVarChar(100), employeeUnqId).query(`
+        SELECT
+
+          -- ==================================================
+          -- TASK ID
+          -- ==================================================
+
+          T.TaskId,
+
+          -- ==================================================
+          -- TASK INFORMATION
+          -- ==================================================
+
+          T.TaskTitle,
+
+          T.TaskDescription,
+
+          -- ==================================================
+          -- ASSIGNED BY
+          -- ==================================================
+
+          T.AssignedBy,
+
+          ISNULL(
+            AB.SM63_6,
+            T.AssignedBy
+          ) AS AssignedByName,
+
+          -- ==================================================
+          -- ASSIGNED TO
+          -- ==================================================
+
+          T.AssignedTo,
+
+          ISNULL(
+            AT.SM63_6,
+            T.AssignedTo
+          ) AS AssignedToName,
+
+          -- ==================================================
+          -- DATES
+          -- ==================================================
+
+          T.StartDate,
+
+          T.DueDate,
+
+          -- ==================================================
+          -- TASK STATUS
+          -- ==================================================
+
+          T.Priority,
+
+          T.Status,
+
+          T.CreatedDate,
+
+          -- ==================================================
+          -- DATABASE
+          -- ==================================================
+
+          T.DatabaseName,
+
+          -- ==================================================
+          -- PROPERTY
+          -- ==================================================
+
+          T.PropertyCode,
+
+          T.AssignedPropertyCode,
+
+          -- ==================================================
+          -- OVERDUE
+          -- ==================================================
+
+          CASE
+
+            WHEN
+              T.Status NOT IN (
+                'Completed',
+                'Cancelled'
+              )
+
+              AND T.DueDate IS NOT NULL
+
+              AND CAST(T.DueDate AS DATE)
+                  < CAST(GETDATE() AS DATE)
+
+            THEN 1
+
+            ELSE 0
+
+          END AS IsOverdue
+
+        FROM MA_ChatTasks T
+
+        -- ====================================================
+        -- ASSIGNED BY
+        -- ====================================================
+
+        LEFT JOIN SM63 AB
+          ON AB.SM63_5 = T.AssignedBy
+
+        -- ====================================================
+        -- ASSIGNED TO
+        --
+        -- SM63.UNQID = uniqueidentifier
+        -- MA_ChatTasks.AssignedTo = nvarchar
+        --
+        -- Convert GUID to string for comparison.
+        -- ====================================================
+
+        LEFT JOIN SM63 AT
+          ON CONVERT(
+               NVARCHAR(100),
+               AT.UNQID
+             ) = T.AssignedTo
+
+        -- ====================================================
+        -- FILTER
+        -- ====================================================
+
+        ${whereCondition}
+
+        -- ====================================================
+        -- ORDER
+        -- ====================================================
+
+        ORDER BY
+
+          CASE
+
+            WHEN T.Status = 'Pending'
+              THEN 1
+
+            WHEN T.Status = 'In Progress'
+              THEN 2
+
+            WHEN T.Status = 'Completed'
+              THEN 3
+
+            WHEN T.Status = 'Cancelled'
+              THEN 4
+
+            ELSE 5
+
+          END,
+
+          T.DueDate ASC,
+
+          T.CreatedDate DESC
+      `);
+
+    // ==========================================================
+    // TASK DATA
+    // ==========================================================
+
+    const tasks = result.recordset;
+
+    // ==========================================================
+    // SUMMARY
+    // ==========================================================
+
+    const total = tasks.length;
+
+    const pending = tasks.filter(
+      (x) => String(x.Status).toLowerCase() === "pending",
+    ).length;
+
+    const inProgress = tasks.filter(
+      (x) => String(x.Status).toLowerCase() === "in progress",
+    ).length;
+
+    const completed = tasks.filter(
+      (x) => String(x.Status).toLowerCase() === "completed",
+    ).length;
+
+    const cancelled = tasks.filter(
+      (x) => String(x.Status).toLowerCase() === "cancelled",
+    ).length;
+
+    const overdue = tasks.filter((x) => Number(x.IsOverdue) === 1).length;
+
+    // ==========================================================
+    // LOG
+    // ==========================================================
+
+    console.log("=================================");
+    console.log("TASK DASHBOARD RESULT");
+    console.log("USER ID =", userId);
+    console.log("EMPLOYEE UNQID =", employeeUnqId);
+    console.log("USER NAME =", loggedInEmployee.UserName);
+    console.log("---------------------------------");
+    console.log("TOTAL =", total);
+    console.log("PENDING =", pending);
+    console.log("IN PROGRESS =", inProgress);
+    console.log("COMPLETED =", completed);
+    console.log("CANCELLED =", cancelled);
+    console.log("OVERDUE =", overdue);
+    console.log("=================================");
+
+    // ==========================================================
+    // RESPONSE
+    // ==========================================================
+
+    return res.status(200).json({
+      success: true,
+
+      loggedInUser: {
+        userId: userId,
+        employeeUnqId: employeeUnqId,
+        userName: loggedInEmployee.UserName,
+      },
+
+      summary: {
+        total: total,
+        pending: pending,
+        inProgress: inProgress,
+        completed: completed,
+        cancelled: cancelled,
+        overdue: overdue,
+      },
+
+      data: tasks,
+    });
+  } catch (err) {
+    console.error("=================================");
+    console.error("TASK DASHBOARD ERROR");
+    console.error(err);
+    console.error("=================================");
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 app.post("/api/update-task-status", async (req, res) => {
   try {
     const { databaseName, taskId, status, changedBy } = req.body;
@@ -3584,81 +3960,7 @@ app.post("/api/task-request-read", async (req, res) => {
 // MARK TASK REQUESTS AS READ
 // ============================================================
 
-app.post("/api/task-request-read", async (req, res) => {
-  try {
-    const { databaseName, userId } = req.body;
 
-    console.log("=================================");
-    console.log("MARK TASK REQUESTS AS READ");
-    console.log("databaseName =", databaseName);
-    console.log("userId =", userId);
-    console.log("=================================");
-
-    if (!databaseName) {
-      return res.status(400).json({
-        success: false,
-        message: "databaseName is required",
-      });
-    }
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "userId is required",
-      });
-    }
-
-    const pool = await getPool(databaseName);
-
-    // Get logged-in employee UNQID
-    const employeeResult = await pool
-      .request()
-      .input("UserId", sql.NVarChar(100), userId).query(`
-        SELECT TOP 1
-          UNQID,
-          SM63_5 AS UserId
-        FROM SM63
-        WHERE SM63_5 = @UserId
-      `);
-
-    const employee = employeeResult.recordset[0];
-
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found in SM63",
-      });
-    }
-
-    const employeeUnqId = employee.UNQID;
-
-    // Mark all unread pending tasks as read
-    const result = await pool
-      .request()
-      .input("EmployeeUnqId", sql.UniqueIdentifier, employeeUnqId).query(`
-        UPDATE MA_ChatTasks
-        SET IsRead = 1
-        WHERE
-          AssignedTo = @EmployeeUnqId
-          AND Status = 'Pending'
-          AND ISNULL(IsRead, 0) = 0
-      `);
-
-    console.log("TASKS MARKED READ =", result.rowsAffected[0]);
-
-    return res.json({
-      success: true,
-      markedRead: result.rowsAffected[0] || 0,
-    });
-  } catch (err) {
-    console.error("MARK TASK READ ERROR =", err);
-
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
-});
 
 const dashboardRoutes =
 require("./routes/dashboard");
