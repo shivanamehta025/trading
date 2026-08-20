@@ -1874,7 +1874,7 @@ MAX(c.CREATEDON) DESC
 });
  */
 
-app.post("/api/chat-users", async (req, res) => {
+/*app.post("/api/chat-users", async (req, res) => {
 
   try {
 
@@ -2003,6 +2003,188 @@ L.CREATEDON DESC
 
       message: err.message
 
+    });
+  }
+});*/
+
+app.post("/api/chat-users", async (req, res) => {
+
+  try {
+
+    const {
+      databaseName,
+      userId
+    } = req.body;
+
+    const pool =
+      await getPool(databaseName);
+
+    const result =
+      await pool.request()
+
+      .input(
+        "USERID",
+        sql.VarChar,
+        userId
+      )
+
+      .query(`
+;WITH LASTCHAT AS
+(
+    SELECT
+        CASE
+            WHEN FROMUSER = @USERID
+            THEN TOUSER
+            ELSE FROMUSER
+        END AS CHATUSER,
+
+        MESSAGE,
+        CREATEDON,
+
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY
+                CASE
+                    WHEN FROMUSER = @USERID
+                    THEN TOUSER
+                    ELSE FROMUSER
+                END
+            ORDER BY CREATEDON DESC
+        ) RN
+
+    FROM APP_CHAT
+
+    WHERE FROMUSER = @USERID
+       OR TOUSER = @USERID
+)
+
+SELECT
+    L.CHATUSER AS USERID,
+
+    S.SM63_6 AS USERNAME,
+
+    B.SM1002_7 AS BRANCHNAME,
+
+    L.MESSAGE AS LASTMESSAGE,
+
+    L.CREATEDON AS LASTMESSAGEDATE,
+
+    CASE
+        WHEN CAST(L.CREATEDON AS DATE) = CAST(GETDATE() AS DATE)
+        THEN FORMAT(L.CREATEDON, 'hh:mm tt')
+
+        WHEN CAST(L.CREATEDON AS DATE) =
+             DATEADD(DAY, -1, CAST(GETDATE() AS DATE))
+        THEN 'Yesterday'
+
+        ELSE FORMAT(L.CREATEDON, 'dd MMM')
+    END AS TIME,
+
+    (
+        SELECT COUNT(*)
+        FROM APP_CHAT C
+        WHERE C.FROMUSER = L.CHATUSER
+          AND C.TOUSER = @USERID
+          AND ISNULL(C.ISREAD, 0) = 0
+    ) AS UNREADCOUNT
+
+FROM LASTCHAT L
+
+LEFT JOIN SM63 S
+    ON S.SM63_5 = L.CHATUSER
+
+LEFT JOIN SM1002 B
+    ON B.SM1002_5 = S.SM63_12
+
+WHERE L.RN = 1
+
+ORDER BY L.CREATEDON DESC;
+
+`);
+
+    res.json({
+
+      success: true,
+
+      data: result.recordset
+
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+
+      success: false,
+
+      message: err.message
+
+    });
+  }
+});
+
+
+
+
+
+
+app.post("/api/all-userslist", async (req, res) => {
+  try {
+    const { databaseName, userId } = req.body;
+
+    console.log("ALL USERS API");
+    console.log("databaseName =", databaseName);
+    console.log("userId =", userId);
+
+    if (!databaseName || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and userId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request().input("userid", sql.VarChar, userId)
+      .query(`
+        SELECT 
+    S.SM63_5 AS data,
+    S.SM63_6 AS value,
+    B.SM1002_7 AS branch
+FROM SM63 S
+
+LEFT JOIN SM1002 B
+    ON B.SM1002_5 = S.SM63_12
+
+WHERE S.SM63_12 IN
+(
+    SELECT data
+    FROM dbo.split(
+        (
+            SELECT SM63_12
+            FROM SM63
+            WHERE SM63_5 = @userid
+        ),
+        ','
+    )
+)
+
+ORDER BY S.SM63_6;
+      `);
+
+    console.log("ALL USERS RESULT =", result.recordset);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.log("ALL USERS ERROR =", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
     });
   }
 });

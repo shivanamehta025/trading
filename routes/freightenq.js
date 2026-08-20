@@ -44,6 +44,8 @@ router.post('/freight-enquiry-masters', async (req, res) => {
 
             // 5 - PO TABLE
             purchaseOrders: result.recordsets[4] || [],
+
+            vehicleTypes: result.recordsets[5] || [],
         });
 
     } catch (error) {
