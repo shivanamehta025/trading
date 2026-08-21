@@ -497,7 +497,7 @@ router.post('/get-freight', async (req, res) => {
             .input('TOCITY', sql.UniqueIdentifier, toCity)
             .input('TRANSPORTER', sql.UniqueIdentifier, transporter)
             .input('PRODUCT', sql.UniqueIdentifier, product)
-            .execute('YOUR_SP_NAME');
+            .execute('GET_FREIGHT');
 
         res.json({
             success: true,
