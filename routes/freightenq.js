@@ -475,5 +475,46 @@ router.post('/freight-enquiry-next-no', async (req, res) => {
     }
 });
 
+router.post('/get-freight', async (req, res) => {
+    try {
+        const {
+            databaseName,
+            vehicleNo,
+            enqDate,
+            fromCity,
+            toCity,
+            transporter,
+            product
+        } = req.body;
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('WHAT', sql.NVarChar(50), 'GET_FREIGHT')
+            .input('VEHICLENO', sql.UniqueIdentifier, vehicleNo)
+            .input('ENQDATE', sql.Date, enqDate)
+            .input('FROMCITY', sql.UniqueIdentifier, fromCity)
+            .input('TOCITY', sql.UniqueIdentifier, toCity)
+            .input('TRANSPORTER', sql.UniqueIdentifier, transporter)
+            .input('PRODUCT', sql.UniqueIdentifier, product)
+            .execute('YOUR_SP_NAME');
+
+        res.json({
+            success: true,
+            freight: result.recordset.length > 0
+                ? result.recordset[0].FREIGHT
+                : null
+        });
+
+    } catch (error) {
+        console.error('GET FREIGHT ERROR:', error);
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 
 module.exports = router;
