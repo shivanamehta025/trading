@@ -2123,10 +2123,114 @@ L.CREATEDON DESC
   }
 });
 
+app.post("/api/create-group", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      groupName,
+      createdBy,
+      members,
+    } = req.body;
 
+    // Validation
+    if (!databaseName || !groupName || !createdBy) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName, groupName and createdBy are required",
+      });
+    }
 
+    if (!Array.isArray(members) || members.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Select at least one group member",
+      });
+    }
 
+    const pool = await getPool(databaseName);
 
+    // Transaction start
+    const transaction = new sql.Transaction(pool);
+
+    await transaction.begin();
+
+    try {
+      // STEP 1: Create group
+      const groupResult = await new sql.Request(transaction)
+        .input("GROUPNAME", sql.VarChar, groupName)
+        .input("CREATEDBY", sql.VarChar, createdBy)
+        .query(`
+          INSERT INTO CHATGROUPS
+          (
+            GROUPNAME,
+            CREATEDBY
+          )
+          OUTPUT INSERTED.GROUPID
+          VALUES
+          (
+            @GROUPNAME,
+            @CREATEDBY
+          )
+        `);
+
+      const groupId = groupResult.recordset[0].GROUPID;
+
+      // STEP 2: CreatedBy ko bhi member list me ensure karo
+      const allMembers = [
+        createdBy,
+        ...members,
+      ];
+
+      // Duplicate users remove
+      const uniqueMembers = [
+        ...new Set(
+          allMembers.map((x) => x.toString().toUpperCase())
+        ),
+      ];
+
+      // STEP 3: Members save
+      for (const userId of uniqueMembers) {
+        await new sql.Request(transaction)
+          .input("GROUPID", sql.Int, groupId)
+          .input("USERID", sql.VarChar, userId)
+          .query(`
+            INSERT INTO CHATGROUPMEMBERS
+            (
+              GROUPID,
+              USERID
+            )
+            VALUES
+            (
+              @GROUPID,
+              @USERID
+            )
+          `);
+      }
+
+      // All successful → Commit
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: "Group created successfully",
+        groupId: groupId,
+      });
+
+    } catch (error) {
+      // Error aaye to sab rollback
+      await transaction.rollback();
+      throw error;
+    }
+
+  } catch (err) {
+    console.log("Create Group Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 
 app.post("/api/all-userslist", async (req, res) => {
   try {
