@@ -2122,6 +2122,7 @@ L.CREATEDON DESC
     });
   }
 });
+//group api's
 
 app.post("/api/create-group", async (req, res) => {
   try {
@@ -2231,6 +2232,600 @@ app.post("/api/create-group", async (req, res) => {
     });
   }
 });
+
+// ===============================
+// GET MY GROUPS
+// ===============================
+app.post("/api/my-groups", async (req, res) => {
+  try {
+    const { databaseName, userId } = req.body;
+
+    if (!databaseName || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and userId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+      .input("USERID", sql.VarChar, userId)
+      .query(`
+        SELECT
+          G.GROUPID,
+          G.GROUPNAME,
+          G.CREATEDBY,
+          G.CREATEDON,
+
+          (
+            SELECT TOP 1 MESSAGE
+            FROM APP_CHAT AC
+            WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+              AND AC.DOCUMENTTYPE = 'GROUP'
+            ORDER BY AC.CREATEDON DESC
+          ) AS LASTMESSAGE,
+
+          (
+            SELECT TOP 1 CREATEDON
+            FROM APP_CHAT AC
+            WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+              AND AC.DOCUMENTTYPE = 'GROUP'
+            ORDER BY AC.CREATEDON DESC
+          ) AS LASTMESSAGEDATE
+
+        FROM CHATGROUPS G
+
+        INNER JOIN CHATGROUPMEMBERS GM
+          ON G.GROUPID = GM.GROUPID
+
+        WHERE UPPER(GM.USERID) = UPPER(@USERID)
+
+        ORDER BY
+          LASTMESSAGEDATE DESC,
+          G.CREATEDON DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+
+  } catch (err) {
+    console.log("Get My Groups Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ===============================
+// RENAME GROUP
+// ===============================
+app.post("/api/rename-group", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      groupId,
+      groupName,
+      userId,
+    } = req.body;
+
+    if (!databaseName || !groupId || !groupName || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName, groupId, groupName and userId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    // Sirf group creator rename kar sakta hai
+    const check = await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .input("USERID", sql.VarChar, userId)
+      .query(`
+        SELECT GROUPID
+        FROM CHATGROUPS
+        WHERE GROUPID = @GROUPID
+          AND UPPER(CREATEDBY) = UPPER(@USERID)
+      `);
+
+    if (check.recordset.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Only group creator can rename this group",
+      });
+    }
+
+    await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .input("GROUPNAME", sql.VarChar, groupName)
+      .query(`
+        UPDATE CHATGROUPS
+        SET GROUPNAME = @GROUPNAME
+        WHERE GROUPID = @GROUPID
+      `);
+
+    res.json({
+      success: true,
+      message: "Group renamed successfully",
+    });
+
+  } catch (err) {
+    console.log("Rename Group Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ===============================
+// DELETE GROUP
+// ===============================
+app.post("/api/delete-group", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      groupId,
+      userId,
+    } = req.body;
+
+    if (!databaseName || !groupId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName, groupId and userId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const check = await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .input("USERID", sql.VarChar, userId)
+      .query(`
+        SELECT GROUPID
+        FROM CHATGROUPS
+        WHERE GROUPID = @GROUPID
+          AND UPPER(CREATEDBY) = UPPER(@USERID)
+      `);
+
+    if (check.recordset.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Only group creator can delete this group",
+      });
+    }
+
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      // Delete group messages
+      await new sql.Request(transaction)
+        .input("REFERENCEID", sql.VarChar, groupId.toString())
+        .query(`
+          DELETE FROM APP_CHAT
+          WHERE REFERENCEID = @REFERENCEID
+            AND DOCUMENTTYPE = 'GROUP'
+        `);
+
+      // Delete members
+      await new sql.Request(transaction)
+        .input("GROUPID", sql.Int, groupId)
+        .query(`
+          DELETE FROM CHATGROUPMEMBERS
+          WHERE GROUPID = @GROUPID
+        `);
+
+      // Delete group
+      await new sql.Request(transaction)
+        .input("GROUPID", sql.Int, groupId)
+        .query(`
+          DELETE FROM CHATGROUPS
+          WHERE GROUPID = @GROUPID
+        `);
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: "Group deleted successfully",
+      });
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (err) {
+    console.log("Delete Group Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+app.post("/api/remove-group-member", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      groupId,
+      userId,
+      requestedBy,
+    } = req.body;
+
+    if (!databaseName || !groupId || !userId || !requestedBy) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "databaseName, groupId, userId and requestedBy are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    // Only group creator can remove members
+    const check = await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .input("USERID", sql.VarChar, requestedBy)
+      .query(`
+        SELECT GROUPID
+        FROM CHATGROUPS
+        WHERE GROUPID = @GROUPID
+          AND UPPER(CREATEDBY) = UPPER(@USERID)
+      `);
+
+    if (check.recordset.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Only group creator can remove members",
+      });
+    }
+
+    // Creator cannot remove himself
+    const creatorCheck = await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .input("USERID", sql.VarChar, userId)
+      .query(`
+        SELECT GROUPID
+        FROM CHATGROUPS
+        WHERE GROUPID = @GROUPID
+          AND UPPER(CREATEDBY) = UPPER(@USERID)
+      `);
+
+    if (creatorCheck.recordset.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Group creator cannot be removed",
+      });
+    }
+
+    const result = await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .input("USERID", sql.VarChar, userId)
+      .query(`
+        DELETE FROM CHATGROUPMEMBERS
+        WHERE GROUPID = @GROUPID
+          AND UPPER(USERID) = UPPER(@USERID)
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found in this group",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Member removed successfully",
+    });
+  } catch (err) {
+    console.log("Remove Group Member Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+app.post("/api/group-details", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      groupId,
+    } = req.body;
+
+    if (!databaseName || !groupId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and groupId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .query(`
+        SELECT
+          GROUPID,
+          GROUPNAME,
+          CREATEDBY,
+          CREATEDON
+        FROM CHATGROUPS
+        WHERE GROUPID = @GROUPID
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.recordset[0],
+    });
+
+  } catch (err) {
+    console.log("Group Details Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+app.post("/api/leave-group", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      groupId,
+      userId,
+    } = req.body;
+
+    if (!databaseName || !groupId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName, groupId and userId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    // Group creator leave nahi kar sakta
+    const creatorCheck = await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .input("USERID", sql.VarChar, userId)
+      .query(`
+        SELECT GROUPID
+        FROM CHATGROUPS
+        WHERE GROUPID = @GROUPID
+          AND UPPER(CREATEDBY) = UPPER(@USERID)
+      `);
+
+    if (creatorCheck.recordset.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Group creator cannot leave the group",
+      });
+    }
+
+    const result = await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .input("USERID", sql.VarChar, userId)
+      .query(`
+        DELETE FROM CHATGROUPMEMBERS
+        WHERE GROUPID = @GROUPID
+          AND UPPER(USERID) = UPPER(@USERID)
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "You are not a member of this group",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "You left the group successfully",
+    });
+
+  } catch (err) {
+    console.log("Leave Group Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ===============================
+// GET GROUP MEMBERS
+// ===============================
+app.post("/api/group-members", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      groupId,
+    } = req.body;
+
+    if (!databaseName || !groupId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and groupId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+      .input("GROUPID", sql.Int, groupId)
+      .query(`
+        SELECT
+          GM.USERID,
+          ISNULL(SM.SM63_2, GM.USERID) AS USERNAME
+        FROM CHATGROUPMEMBERS GM
+        LEFT JOIN SM63 SM
+          ON UPPER(SM.SM63_1) = UPPER(GM.USERID)
+        WHERE GM.GROUPID = @GROUPID
+        ORDER BY
+          CASE
+            WHEN UPPER(GM.USERID) =
+                 (
+                   SELECT UPPER(CREATEDBY)
+                   FROM CHATGROUPS
+                   WHERE GROUPID = @GROUPID
+                 )
+            THEN 0
+            ELSE 1
+          END,
+          USERNAME
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+
+  } catch (err) {
+    console.log("Group Members Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ===============================
+// SEND GROUP MESSAGE
+// ===============================
+app.post("/api/group-message", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      groupId,
+      fromUser,
+      message,
+    } = req.body;
+
+    if (!databaseName || !groupId || !fromUser || !message) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName, groupId, fromUser and message are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    await pool
+      .request()
+      .input("REFERENCEID", sql.VarChar, groupId.toString())
+      .input("FROMUSER", sql.VarChar, fromUser)
+      .input("MESSAGE", sql.VarChar, message)
+      .input("DOCUMENTTYPE", sql.VarChar, "GROUP")
+      .query(`
+        INSERT INTO APP_CHAT
+        (
+          REFERENCEID,
+          FROMUSER,
+          MESSAGE,
+          DOCUMENTTYPE,
+          CREATEDON
+        )
+        VALUES
+        (
+          @REFERENCEID,
+          @FROMUSER,
+          @MESSAGE,
+          @DOCUMENTTYPE,
+          GETDATE()
+        )
+      `);
+
+    res.json({
+      success: true,
+      message: "Group message sent successfully",
+    });
+
+  } catch (err) {
+    console.log("Group Message Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+
+// ===============================
+// GET GROUP MESSAGES
+// ===============================
+app.post("/api/group-messages", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      groupId,
+    } = req.body;
+
+    if (!databaseName || !groupId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and groupId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+      .input("REFERENCEID", sql.VarChar, groupId.toString())
+      .query(`
+        SELECT
+          FROMUSER,
+          MESSAGE,
+          CREATEDON
+        FROM APP_CHAT
+        WHERE REFERENCEID = @REFERENCEID
+          AND DOCUMENTTYPE = 'GROUP'
+        ORDER BY CREATEDON ASC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+
+  } catch (err) {
+    console.log("Get Group Messages Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+//group 
+
+
 
 app.post("/api/all-userslist", async (req, res) => {
   try {
