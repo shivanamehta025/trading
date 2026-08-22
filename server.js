@@ -2321,42 +2321,24 @@ app.post("/api/all-users", async (req, res) => {
     console.log("level =", level);
     console.log("=================================");
 
-    // ==========================================================
-    // VALIDATION
-    // ==========================================================
-
-    if (!databaseName || !userId || level === undefined || level === null) {
+    if (
+      !databaseName ||
+      !userId ||
+      level === undefined ||
+      level === null
+    ) {
       return res.status(400).json({
         success: false,
         message: "databaseName, userId, and level are required",
       });
     }
 
-    // ==========================================================
-    // DATABASE CONNECTION
-    // ==========================================================
-
     const pool = await getPool(databaseName);
-
-    // ==========================================================
-    // GET ALL USERS
-    // ==========================================================
 
     const result = await pool
       .request()
-
-      .input(
-        "userid",
-        sql.VarChar,
-        String(userId)
-      )
-
-      .input(
-        "level",
-        sql.Int,
-        Number(level)
-      )
-
+      .input("userid", sql.VarChar, String(userId))
+      .input("level", sql.Int, Number(level))
       .query(`
         SELECT
             s63.UNQID AS data,
@@ -2364,16 +2346,29 @@ app.post("/api/all-users", async (req, res) => {
             -- EMPLOYEE NAME
             s63.SM63_6 AS value,
 
-            -- ACTUAL BRANCH NAME
-            b.SM1002_7 AS branch
+            -- BRANCH CITY ONLY
+            CASE
+                WHEN CHARINDEX('(', b.SM1002_7) > 0
+                     AND CHARINDEX(')', b.SM1002_7) >
+                         CHARINDEX('(', b.SM1002_7)
+                THEN
+                    LTRIM(RTRIM(
+                        SUBSTRING(
+                            b.SM1002_7,
+                            CHARINDEX('(', b.SM1002_7) + 1,
+                            CHARINDEX(')', b.SM1002_7)
+                            - CHARINDEX('(', b.SM1002_7) - 1
+                        )
+                    ))
+                ELSE
+                    LTRIM(RTRIM(b.SM1002_7))
+            END AS branch
 
         FROM SM63 AS s63
 
-        -- EMPLOYEE DESIGNATION / LEVEL
         INNER JOIN SM61 AS s61
             ON s61.UNQID = s63.SM63_8
 
-        -- ACTUAL BRANCH
         LEFT JOIN SM1002 AS b
             ON b.SM1002_5 = s63.SM63_12
 
@@ -2390,9 +2385,7 @@ app.post("/api/all-users", async (req, res) => {
             (
                 (
                     SELECT SM63_12
-
                     FROM SM63
-
                     WHERE SM63_5 = @userid
                 ),
                 ','
@@ -2406,10 +2399,6 @@ app.post("/api/all-users", async (req, res) => {
         (
             CASE
 
-                -- ==================================================
-                -- HIGHEST LEVEL USER
-                -- ==================================================
-
                 WHEN @level = (
                     SELECT MAX(
                         TRY_CONVERT(
@@ -2417,7 +2406,6 @@ app.post("/api/all-users", async (req, res) => {
                             SM61_9
                         )
                     )
-
                     FROM SM61
                 )
 
@@ -2428,13 +2416,8 @@ app.post("/api/all-users", async (req, res) => {
                             s61.SM61_9
                         ) > @level
                         THEN 1
-
                         ELSE 0
                     END
-
-                -- ==================================================
-                -- NORMAL LEVEL USER
-                -- ==================================================
 
                 ELSE
                     CASE
@@ -2443,19 +2426,14 @@ app.post("/api/all-users", async (req, res) => {
                             s61.SM61_9
                         ) >= @level
                         THEN 1
-
                         ELSE 0
                     END
+
             END
         ) = 1
 
-        ORDER BY
-            s63.SM63_6;
+        ORDER BY s63.SM63_6;
       `);
-
-    // ==========================================================
-    // LOG RESULT
-    // ==========================================================
 
     console.log(
       "ALL USERS RESULT COUNT =",
@@ -2466,10 +2444,6 @@ app.post("/api/all-users", async (req, res) => {
       "ALL USERS RESULT =",
       result.recordset
     );
-
-    // ==========================================================
-    // RESPONSE
-    // ==========================================================
 
     return res.status(200).json({
       success: true,
