@@ -2831,19 +2831,25 @@ app.post("/api/assign-task", async (req, res) => {
     }
 
     // ========================================================
-    // DATE CONVERSION
-    // ONLY THIS PART IS CHANGED
+    // DATE VALIDATION
+    // IMPORTANT:
+    // Do NOT use new Date() here.
+    // Keep the date/time as a local SQL datetime string.
     // ========================================================
 
     let parsedStartDate = null;
     let parsedDueDate = null;
 
     if (startDate) {
-      parsedStartDate = new Date(
-        startDate.replace("T", " ") + " GMT+0530"
-      );
+      parsedStartDate = String(startDate)
+        .replace("T", " ")
+        .substring(0, 19);
 
-      if (isNaN(parsedStartDate.getTime())) {
+      if (
+        !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(
+          parsedStartDate
+        )
+      ) {
         return res.status(400).json({
           success: false,
           message: "Invalid startDate",
@@ -2852,11 +2858,15 @@ app.post("/api/assign-task", async (req, res) => {
     }
 
     if (dueDate) {
-      parsedDueDate = new Date(
-        dueDate.replace("T", " ") + " GMT+0530"
-      );
+      parsedDueDate = String(dueDate)
+        .replace("T", " ")
+        .substring(0, 19);
 
-      if (isNaN(parsedDueDate.getTime())) {
+      if (
+        !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(
+          parsedDueDate
+        )
+      ) {
         return res.status(400).json({
           success: false,
           message: "Invalid dueDate",
@@ -2915,7 +2925,7 @@ app.post("/api/assign-task", async (req, res) => {
         .input(
           "TaskDescription",
           sql.NVarChar(sql.MAX),
-          taskDescription || null,
+          taskDescription || null
         )
 
         // ------------------------------------------------------
@@ -2940,21 +2950,23 @@ app.post("/api/assign-task", async (req, res) => {
 
         // ------------------------------------------------------
         // START DATE
+        // Keep as string to avoid timezone conversion
         // ------------------------------------------------------
 
         .input(
           "StartDate",
-          sql.DateTime,
+          sql.NVarChar(19),
           parsedStartDate
         )
 
         // ------------------------------------------------------
         // DUE DATE
+        // Keep as string to avoid timezone conversion
         // ------------------------------------------------------
 
         .input(
           "DueDate",
-          sql.DateTime,
+          sql.NVarChar(19),
           parsedDueDate
         )
 
@@ -3005,8 +3017,12 @@ app.post("/api/assign-task", async (req, res) => {
         .input(
           "AssignedPropertyCode",
           sql.NVarChar(20),
-          assignedPropertyCode || null,
+          assignedPropertyCode || null
         )
+
+        // ------------------------------------------------------
+        // SQL QUERY
+        // ------------------------------------------------------
 
         .query(`
         INSERT INTO MA_ChatTasks
@@ -3033,8 +3049,10 @@ app.post("/api/assign-task", async (req, res) => {
           @TaskDescription,
           @AssignedBy,
           @AssignedTo,
-          @StartDate,
-          @DueDate,
+
+          CONVERT(datetime, @StartDate, 120),
+          CONVERT(datetime, @DueDate, 120),
+
           @Priority,
           @Status,
           GETDATE(),
