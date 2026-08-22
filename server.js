@@ -3035,6 +3035,10 @@ app.post("/api/assign-task", async (req, res) => {
 // TASK DASHBOARD
 // ============================================================
 
+// ============================================================
+// TASK DASHBOARD
+// ============================================================
+
 app.post("/api/task-dashboard", async (req, res) => {
   try {
 
@@ -3043,6 +3047,7 @@ app.post("/api/task-dashboard", async (req, res) => {
       userId,
       viewType = "All"
     } = req.body;
+
 
     console.log("=================================");
     console.log("TASK DASHBOARD API");
@@ -3115,12 +3120,10 @@ app.post("/api/task-dashboard", async (req, res) => {
 
 
     if (!loggedInEmployee) {
-
       return res.status(404).json({
         success: false,
         message: "Logged-in user not found in SM63"
       });
-
     }
 
 
@@ -3155,9 +3158,9 @@ app.post("/api/task-dashboard", async (req, res) => {
     let whereCondition = "";
 
 
-    // ----------------------------------------------------------
+    // ==========================================================
     // INDIVIDUAL
-    // ----------------------------------------------------------
+    // ==========================================================
 
     if (viewType === "Individual") {
 
@@ -3169,9 +3172,9 @@ app.post("/api/task-dashboard", async (req, res) => {
     }
 
 
-    // ----------------------------------------------------------
+    // ==========================================================
     // GROUP
-    // ----------------------------------------------------------
+    // ==========================================================
 
     else if (viewType === "Group") {
 
@@ -3187,9 +3190,9 @@ app.post("/api/task-dashboard", async (req, res) => {
     }
 
 
-    // ----------------------------------------------------------
+    // ==========================================================
     // ALL
-    // ----------------------------------------------------------
+    // ==========================================================
 
     else {
 
@@ -3293,6 +3296,16 @@ app.post("/api/task-dashboard", async (req, res) => {
           T.Status,
 
           T.CreatedDate,
+
+
+          -- ==================================================
+          -- READ STATUS
+          -- ==================================================
+
+          ISNULL(
+            T.IsRead,
+            0
+          ) AS IsRead,
 
 
           -- ==================================================
@@ -3527,7 +3540,6 @@ app.post("/api/task-dashboard", async (req, res) => {
 
       success: true,
 
-
       loggedInUser: {
 
         userId: userId,
@@ -3539,7 +3551,6 @@ app.post("/api/task-dashboard", async (req, res) => {
           loggedInEmployee.UserName
 
       },
-
 
       summary: {
 
@@ -3556,7 +3567,6 @@ app.post("/api/task-dashboard", async (req, res) => {
         overdue: overdue
 
       },
-
 
       data: tasks
 
@@ -3592,9 +3602,20 @@ app.post("/api/task-dashboard", async (req, res) => {
 
 });
 
+// ============================================================
+// UPDATE TASK STATUS
+// ============================================================
+
 app.post("/api/update-task-status", async (req, res) => {
   try {
-    const { databaseName, taskId, status, changedBy } = req.body;
+
+    const {
+      databaseName,
+      taskId,
+      status,
+      changedBy
+    } = req.body;
+
 
     console.log("=================================");
     console.log("UPDATE TASK STATUS");
@@ -3604,167 +3625,371 @@ app.post("/api/update-task-status", async (req, res) => {
     console.log("changedBy =", changedBy);
     console.log("=================================");
 
-    // ----------------------------------------------------------
+
+    // ==========================================================
     // VALIDATION
-    // ----------------------------------------------------------
+    // ==========================================================
 
     if (!databaseName) {
       return res.status(400).json({
         success: false,
-        message: "databaseName is required",
+        message: "databaseName is required"
       });
     }
+
 
     if (!taskId) {
       return res.status(400).json({
         success: false,
-        message: "taskId is required",
+        message: "taskId is required"
       });
     }
+
 
     if (!status) {
       return res.status(400).json({
         success: false,
-        message: "status is required",
+        message: "status is required"
       });
     }
+
+
+    // ==========================================================
+    // ALLOWED STATUS
+    // ==========================================================
 
     const allowedStatuses = [
       "Pending",
       "In Progress",
       "Completed",
-      "Cancelled",
+      "Cancelled"
     ];
 
+
     if (!allowedStatuses.includes(status)) {
+
       return res.status(400).json({
         success: false,
-        message: "Invalid task status",
+        message: "Invalid task status"
       });
+
     }
 
-    const pool = await getPool(databaseName);
 
-    // ----------------------------------------------------------
-    // GET TASK DETAILS BEFORE UPDATE
-    // ----------------------------------------------------------
+    // ==========================================================
+    // DATABASE
+    // ==========================================================
 
-    const taskResult = await pool
-      .request()
-      .input("TaskId", sql.UniqueIdentifier, taskId).query(`
-        SELECT TOP 1
-          T.TaskId,
-          T.TaskTitle,
-          T.AssignedBy,
-          T.AssignedTo,
-          T.Status AS OldStatus,
-          T.DatabaseName,
+    const pool =
+      await getPool(databaseName);
 
-   ISNULL(AB.SM63_6, T.AssignedBy) AS AssignedByName,
-ISNULL(
-    AT.SM63_6,
-    CAST(T.AssignedTo AS NVARCHAR(100))
-) AS AssignedToName
 
-        FROM MA_ChatTasks T
+    // ==========================================================
+    // GET TASK BEFORE UPDATE
+    // ==========================================================
 
-        LEFT JOIN SM63 AB
-          ON AB.SM63_5 = T.AssignedBy
+    const taskResult =
+      await pool
+        .request()
 
-        LEFT JOIN SM63 AT
-          ON AT.UNQID = T.AssignedTo
+        .input(
+          "TaskId",
+          sql.UniqueIdentifier,
+          taskId
+        )
 
-        WHERE T.TaskId = @TaskId
-      `);
+        .query(`
+
+          SELECT TOP 1
+
+            T.TaskId,
+
+            T.TaskTitle,
+
+            T.AssignedBy,
+
+            T.AssignedTo,
+
+            T.Status AS OldStatus,
+
+            T.DatabaseName,
+
+            ISNULL(
+              AB.SM63_6,
+              T.AssignedBy
+            ) AS AssignedByName,
+
+            ISNULL(
+              AT.SM63_6,
+              CAST(
+                T.AssignedTo AS NVARCHAR(100)
+              )
+            ) AS AssignedToName
+
+          FROM MA_ChatTasks T
+
+
+          LEFT JOIN SM63 AB
+
+            ON AB.SM63_5 = T.AssignedBy
+
+
+          LEFT JOIN SM63 AT
+
+            ON AT.UNQID = T.AssignedTo
+
+
+          WHERE T.TaskId = @TaskId
+
+        `);
+
+
+    // ==========================================================
+    // TASK NOT FOUND
+    // ==========================================================
 
     if (taskResult.recordset.length === 0) {
+
       return res.status(404).json({
         success: false,
-        message: "Task not found",
+        message: "Task not found"
       });
+
     }
 
-    const task = taskResult.recordset[0];
 
-    const assignedBy = task.AssignedBy;
-    const assignedTo = task.AssignedTo;
-    const taskTitle = task.TaskTitle;
-    const oldStatus = task.OldStatus;
-    const assignedToName = task.AssignedToName;
+    const task =
+      taskResult.recordset[0];
 
-    console.log("TASK FOUND");
-    console.log("Assigned By =", assignedBy);
-    console.log("Assigned To =", assignedTo);
-    console.log("Task Title =", taskTitle);
-    console.log("Old Status =", oldStatus);
-    console.log("New Status =", status);
 
-    // ----------------------------------------------------------
+    const assignedBy =
+      task.AssignedBy;
+
+
+    const assignedTo =
+      task.AssignedTo;
+
+
+    const taskTitle =
+      task.TaskTitle;
+
+
+    const oldStatus =
+      task.OldStatus;
+
+
+    const assignedToName =
+      task.AssignedToName;
+
+
+    console.log(
+      "TASK FOUND"
+    );
+
+    console.log(
+      "Assigned By =",
+      assignedBy
+    );
+
+    console.log(
+      "Assigned To =",
+      assignedTo
+    );
+
+    console.log(
+      "Task Title =",
+      taskTitle
+    );
+
+    console.log(
+      "Old Status =",
+      oldStatus
+    );
+
+    console.log(
+      "New Status =",
+      status
+    );
+
+
+    // ==========================================================
     // NOTHING CHANGED
-    // ----------------------------------------------------------
+    // ==========================================================
 
     if (oldStatus === status) {
+
       return res.json({
         success: true,
-        message: "Task status is already " + status,
+        message:
+          "Task status is already " + status
       });
+
     }
 
-    // ----------------------------------------------------------
+
+    // ==========================================================
     // UPDATE TASK
-    // ----------------------------------------------------------
+    //
+    // IMPORTANT:
+    //
+    // Status changes
+    // IsRead changes to 1
+    //
+    // This stops the blink.
+    // ==========================================================
 
-    const updateResult = await pool
-      .request()
-      .input("TaskId", sql.UniqueIdentifier, taskId)
-      .input("Status", sql.NVarChar(20), status).query(`
-        UPDATE MA_ChatTasks
-        SET Status = @Status
-        WHERE TaskId = @TaskId
-      `);
+    const updateResult =
+      await pool
+        .request()
 
-    if (updateResult.rowsAffected[0] === 0) {
+        .input(
+          "TaskId",
+          sql.UniqueIdentifier,
+          taskId
+        )
+
+        .input(
+          "Status",
+          sql.NVarChar(20),
+          status
+        )
+
+        .query(`
+
+          UPDATE MA_ChatTasks
+
+          SET
+
+            Status = @Status,
+
+            IsRead = 1
+
+          WHERE TaskId = @TaskId
+
+        `);
+
+
+    // ==========================================================
+    // UPDATE FAILED
+    // ==========================================================
+
+    if (
+      updateResult.rowsAffected[0] === 0
+    ) {
+
       return res.status(404).json({
         success: false,
-        message: "Task update failed",
+        message: "Task update failed"
       });
+
     }
 
-    // ----------------------------------------------------------
-    // DO NOT NOTIFY USER IF SAME USER UPDATED OWN TASK
-    // ----------------------------------------------------------
+
+    console.log(
+      "TASK STATUS UPDATED"
+    );
+
+    console.log(
+      "Status =",
+      status
+    );
+
+    console.log(
+      "IsRead = 1"
+    );
+
+
+    // ==========================================================
+    // DO NOT NOTIFY USER IF SAME USER
+    // ==========================================================
 
     if (assignedBy === changedBy) {
+
       return res.json({
+
         success: true,
-        message: "Task status updated successfully",
+
+        message:
+          "Task status updated successfully",
+
+        taskId:
+          taskId,
+
+        oldStatus:
+          oldStatus,
+
+        newStatus:
+          status
+
       });
+
     }
 
-    // ----------------------------------------------------------
-    // NOTIFICATION MESSAGE
-    // ----------------------------------------------------------
 
-    const notificationTitle = "Task Status Updated";
+    // ==========================================================
+    // NOTIFICATION MESSAGE
+    // ==========================================================
+
+    const notificationTitle =
+      "Task Status Updated";
+
 
     const notificationMessage =
       `${assignedToName} changed "${taskTitle}" status ` +
       `from ${oldStatus} to ${status}.`;
 
-    console.log("NOTIFICATION USER =", assignedBy);
-    console.log("NOTIFICATION MESSAGE =", notificationMessage);
 
-    // ----------------------------------------------------------
-    // SAVE NOTIFICATION IN APP_NOTIFICATION
-    // ----------------------------------------------------------
+    console.log(
+      "NOTIFICATION USER =",
+      assignedBy
+    );
+
+
+    console.log(
+      "NOTIFICATION MESSAGE =",
+      notificationMessage
+    );
+
+
+    // ==========================================================
+    // SAVE NOTIFICATION
+    // ==========================================================
 
     await pool
       .request()
-      .input("USERID", sql.VarChar, assignedBy)
-      .input("TITLE", sql.VarChar, notificationTitle)
-      .input("MESSAGE", sql.NVarChar, notificationMessage)
-      .input("REFERENCEID", sql.VarChar, taskId)
-      .input("DATABASENAME", sql.VarChar, databaseName).query(`
+
+      .input(
+        "USERID",
+        sql.VarChar,
+        assignedBy
+      )
+
+      .input(
+        "TITLE",
+        sql.VarChar,
+        notificationTitle
+      )
+
+      .input(
+        "MESSAGE",
+        sql.NVarChar,
+        notificationMessage
+      )
+
+      .input(
+        "REFERENCEID",
+        sql.VarChar,
+        taskId
+      )
+
+      .input(
+        "DATABASENAME",
+        sql.VarChar,
+        databaseName
+      )
+
+      .query(`
+
         INSERT INTO APP_NOTIFICATION
         (
           USERID,
@@ -3775,6 +4000,7 @@ ISNULL(
           ISREAD,
           CREATEDON
         )
+
         VALUES
         (
           @USERID,
@@ -3785,71 +4011,164 @@ ISNULL(
           0,
           GETDATE()
         )
+
       `);
 
-    console.log("APP NOTIFICATION SAVED");
 
-    // ----------------------------------------------------------
-    // SEND FCM PUSH NOTIFICATION
-    // ----------------------------------------------------------
+    console.log(
+      "APP NOTIFICATION SAVED"
+    );
+
+
+    // ==========================================================
+    // FCM PUSH NOTIFICATION
+    // ==========================================================
 
     try {
-      const companyPool = await getPool();
 
-      const tokenResult = await companyPool
-        .request()
-        .input("userId", sql.VarChar, assignedBy).query(`
-          SELECT DEVICETOKEN
-          FROM APP_DEVICE_TOKEN
-          WHERE USERID = @userId
-        `);
+      const companyPool =
+        await getPool();
 
-      console.log("ASSIGNER DEVICE TOKENS =", tokenResult.recordset.length);
 
-      for (const row of tokenResult.recordset) {
+      const tokenResult =
+        await companyPool
+          .request()
+
+          .input(
+            "userId",
+            sql.VarChar,
+            assignedBy
+          )
+
+          .query(`
+
+            SELECT DEVICETOKEN
+
+            FROM APP_DEVICE_TOKEN
+
+            WHERE USERID = @userId
+
+          `);
+
+
+      console.log(
+        "ASSIGNER DEVICE TOKENS =",
+        tokenResult.recordset.length
+      );
+
+
+      for (
+        const row
+        of tokenResult.recordset
+      ) {
+
         if (row.DEVICETOKEN) {
+
           await sendNotification(
+
             row.DEVICETOKEN,
+
             notificationTitle,
+
             notificationMessage,
+
             {
-              type: "TASK_STATUS",
-              taskId: taskId,
-              databaseName: databaseName,
-              status: status,
-            },
+              type:
+                "TASK_STATUS",
+
+              taskId:
+                taskId,
+
+              databaseName:
+                databaseName,
+
+              status:
+                status
+            }
+
           );
+
         }
+
       }
 
-      console.log("FCM TASK STATUS NOTIFICATION SENT");
-    } catch (notificationError) {
-      // Notification failure should NOT make task update fail
-      console.error("TASK FCM NOTIFICATION ERROR =", notificationError);
+
+      console.log(
+        "FCM TASK STATUS NOTIFICATION SENT"
+      );
+
+
+    } catch (
+      notificationError
+    ) {
+
+      // Notification failure should
+      // NOT make task update fail
+
+      console.error(
+        "TASK FCM NOTIFICATION ERROR =",
+        notificationError
+      );
+
     }
 
-    // ----------------------------------------------------------
+
+    // ==========================================================
     // RESPONSE
-    // ----------------------------------------------------------
+    // ==========================================================
 
     return res.json({
+
       success: true,
-      message: "Task status updated successfully",
-      taskId: taskId,
-      oldStatus: oldStatus,
-      newStatus: status,
-      notifiedUser: assignedBy,
+
+      message:
+        "Task status updated successfully",
+
+      taskId:
+        taskId,
+
+      oldStatus:
+        oldStatus,
+
+      newStatus:
+        status,
+
+      isRead:
+        1,
+
+      notifiedUser:
+        assignedBy
+
     });
+
+
   } catch (err) {
-    console.error("=================================");
-    console.error("UPDATE TASK STATUS ERROR =", err);
-    console.error("=================================");
+
+    console.error(
+      "================================="
+    );
+
+    console.error(
+      "UPDATE TASK STATUS ERROR =",
+      err
+    );
+
+    console.error(
+      "================================="
+    );
+
 
     return res.status(500).json({
+
       success: false,
-      message: err.message,
+
+      message:
+        err.message
+
     });
+
   }
+
 });
 // ============================================================
 // FINAL TASK APPROVAL
