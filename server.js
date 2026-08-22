@@ -3216,18 +3216,25 @@ app.post("/api/task-dashboard", async (req, res) => {
           -- TASK STATUS
           -- ==================================================
 
-          T.Priority,
+        T.Priority,
 
-          T.Status,
+T.Status,
 
-          T.CreatedDate,
+T.CreatedDate,
 
-          -- ==================================================
-          -- DATABASE
-          -- ==================================================
+// ==================================================
+// FINAL APPROVAL
+// ==================================================
 
-          T.DatabaseName,
+T.FinalApprovalDateTime,
 
+T.FinalApprovedBy,
+
+// ==================================================
+// DATABASE
+// ==================================================
+
+T.DatabaseName,
           -- ==================================================
           -- PROPERTY
           -- ==================================================
@@ -3654,6 +3661,185 @@ ISNULL(
   } catch (err) {
     console.error("=================================");
     console.error("UPDATE TASK STATUS ERROR =", err);
+    console.error("=================================");
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ============================================================
+// FINAL TASK APPROVAL
+// Only the person who assigned the task can approve it
+// ============================================================
+
+app.post("/api/approve-task", async (req, res) => {
+  try {
+    const { databaseName, taskId, approvedBy } = req.body;
+
+    console.log("=================================");
+    console.log("FINAL TASK APPROVAL");
+    console.log("databaseName =", databaseName);
+    console.log("taskId =", taskId);
+    console.log("approvedBy =", approvedBy);
+    console.log("=================================");
+
+    // ========================================================
+    // VALIDATION
+    // ========================================================
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!taskId) {
+      return res.status(400).json({
+        success: false,
+        message: "taskId is required",
+      });
+    }
+
+    if (!approvedBy) {
+      return res.status(400).json({
+        success: false,
+        message: "approvedBy is required",
+      });
+    }
+
+    // ========================================================
+    // DATABASE CONNECTION
+    // ========================================================
+
+    const pool = await getPool(databaseName);
+
+    // ========================================================
+    // GET TASK
+    // ========================================================
+
+    const taskResult = await pool
+      .request()
+      .input("TaskId", sql.UniqueIdentifier, taskId).query(`
+        SELECT TOP 1
+            TaskId,
+            TaskTitle,
+            AssignedBy,
+            AssignedTo,
+            Status
+        FROM MA_ChatTasks
+        WHERE TaskId = @TaskId
+      `);
+
+    // ========================================================
+    // TASK NOT FOUND
+    // ========================================================
+
+    if (taskResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    const task = taskResult.recordset[0];
+
+    console.log("TASK FOUND");
+    console.log("AssignedBy =", task.AssignedBy);
+    console.log("AssignedTo =", task.AssignedTo);
+    console.log("Status =", task.Status);
+
+    // ========================================================
+    // ONLY ASSIGNER CAN APPROVE
+    // ========================================================
+
+    if (String(task.AssignedBy).trim() !== String(approvedBy).trim()) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the person who assigned the task can approve it",
+      });
+    }
+
+    // ========================================================
+    // TASK MUST BE COMPLETED
+    // ========================================================
+
+    if (String(task.Status).trim().toLowerCase() !== "completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Task must be Completed before final approval",
+      });
+    }
+
+    // ========================================================
+    // CHECK IF ALREADY APPROVED
+    // ========================================================
+
+    const alreadyApproved = await pool
+      .request()
+      .input("TaskId", sql.UniqueIdentifier, taskId).query(`
+        SELECT
+            FinalApprovalDateTime,
+            FinalApprovedBy
+        FROM MA_ChatTasks
+        WHERE TaskId = @TaskId
+      `);
+
+    const approvalData = alreadyApproved.recordset[0];
+
+    if (approvalData.FinalApprovalDateTime != null) {
+      return res.status(400).json({
+        success: false,
+        message: "Task has already been finally approved",
+      });
+    }
+
+    // ========================================================
+    // SAVE FINAL APPROVAL
+    // ========================================================
+
+    const updateResult = await pool
+      .request()
+      .input("TaskId", sql.UniqueIdentifier, taskId)
+      .input("FinalApprovedBy", sql.NVarChar(100), approvedBy).query(`
+        UPDATE MA_ChatTasks
+        SET
+            FinalApprovalDateTime = GETDATE(),
+            FinalApprovedBy = @FinalApprovedBy
+        WHERE TaskId = @TaskId
+      `);
+
+    // ========================================================
+    // CHECK UPDATE
+    // ========================================================
+
+    if (updateResult.rowsAffected[0] === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Final approval could not be saved",
+      });
+    }
+
+    // ========================================================
+    // SUCCESS
+    // ========================================================
+
+    console.log("FINAL APPROVAL SAVED");
+    console.log("TaskId =", taskId);
+    console.log("ApprovedBy =", approvedBy);
+
+    return res.json({
+      success: true,
+      message: "Task finally approved successfully",
+      taskId: taskId,
+      approvedBy: approvedBy,
+    });
+  } catch (err) {
+    console.error("=================================");
+    console.error("FINAL APPROVAL ERROR");
+    console.error(err);
     console.error("=================================");
 
     return res.status(500).json({
