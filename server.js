@@ -2009,118 +2009,116 @@ L.CREATEDON DESC
 
 
 app.post("/api/chat-users", async (req, res) => {
-
   try {
+    const { databaseName, userId } = req.body;
 
-    const {
-      databaseName,
-      userId
-    } = req.body;
+    const pool = await getPool(databaseName);
 
-    const pool =
-      await getPool(databaseName);
+    const result = await pool
+      .request()
 
-    const result =
-      await pool.request()
+      .input("USERID", sql.VarChar, userId).query(`
 
-      .input(
-        "USERID",
-        sql.VarChar,
-        userId
-      )
-
-      .query(`
 ;WITH LASTCHAT AS
 (
-    SELECT
-        CASE
-            WHEN FROMUSER = @USERID
-            THEN TOUSER
-            ELSE FROMUSER
-        END AS CHATUSER,
 
-        MESSAGE,
-        CREATEDON,
+SELECT
 
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY
-                CASE
-                    WHEN FROMUSER = @USERID
-                    THEN TOUSER
-                    ELSE FROMUSER
-                END
-            ORDER BY CREATEDON DESC
-        ) RN
+CASE
+WHEN FROMUSER=@USERID
+THEN TOUSER
+ELSE FROMUSER
+END AS CHATUSER,
 
-    FROM APP_CHAT
+MESSAGE,
 
-    WHERE FROMUSER = @USERID
-       OR TOUSER = @USERID
+CREATEDON,
+
+ROW_NUMBER() OVER
+(
+PARTITION BY
+CASE
+WHEN FROMUSER=@USERID
+THEN TOUSER
+ELSE FROMUSER
+END
+ORDER BY CREATEDON DESC
+) RN
+
+FROM APP_CHAT
+
+WHERE
+FROMUSER=@USERID
+OR
+TOUSER=@USERID
+
 )
 
 SELECT
-    L.CHATUSER AS USERID,
 
-    S.SM63_6 AS USERNAME,
+L.CHATUSER AS USERID,
 
-    B.SM1002_7 AS BRANCHNAME,
+S.SM63_6 AS USERNAME,
 
-    L.MESSAGE AS LASTMESSAGE,
+L.MESSAGE AS LASTMESSAGE,
 
-    L.CREATEDON AS LASTMESSAGEDATE,
+L.CREATEDON AS LASTMESSAGEDATE,
 
-    CASE
-        WHEN CAST(L.CREATEDON AS DATE) = CAST(GETDATE() AS DATE)
-        THEN FORMAT(L.CREATEDON, 'hh:mm tt')
+CASE
 
-        WHEN CAST(L.CREATEDON AS DATE) =
-             DATEADD(DAY, -1, CAST(GETDATE() AS DATE))
-        THEN 'Yesterday'
+WHEN CAST(L.CREATEDON AS DATE)=CAST(GETDATE() AS DATE)
+THEN FORMAT(L.CREATEDON,'hh:mm tt')
 
-        ELSE FORMAT(L.CREATEDON, 'dd MMM')
-    END AS TIME,
+WHEN CAST(L.CREATEDON AS DATE)=DATEADD(DAY,-1,CAST(GETDATE() AS DATE))
+THEN 'Yesterday'
 
-    (
-        SELECT COUNT(*)
-        FROM APP_CHAT C
-        WHERE C.FROMUSER = L.CHATUSER
-          AND C.TOUSER = @USERID
-          AND ISNULL(C.ISREAD, 0) = 0
-    ) AS UNREADCOUNT
+ELSE FORMAT(L.CREATEDON,'dd MMM')
+
+END AS TIME,
+
+(
+
+SELECT COUNT(*)
+
+FROM APP_CHAT C
+
+WHERE
+
+C.FROMUSER=L.CHATUSER
+
+AND
+C.TOUSER=@USERID
+
+AND
+ISNULL(C.ISREAD,0)=0
+
+) AS UNREADCOUNT
 
 FROM LASTCHAT L
 
 LEFT JOIN SM63 S
-    ON S.SM63_5 = L.CHATUSER
+  ON S.SM63_5 = L.CHATUSER
+  OR CONVERT(NVARCHAR(100), S.UNQID) = L.CHATUSER
 
-LEFT JOIN SM1002 B
-    ON B.SM1002_5 = S.SM63_12
+WHERE RN=1
 
-WHERE L.RN = 1
-
-ORDER BY L.CREATEDON DESC;
+ORDER BY
+L.CREATEDON DESC
 
 `);
 
     res.json({
-
       success: true,
 
-      data: result.recordset
-
+      data: result.recordset,
     });
-
   } catch (err) {
-
     console.log(err);
 
     res.status(500).json({
-
       success: false,
 
-      message: err.message
-
+      message: err.message,
     });
   }
 });
