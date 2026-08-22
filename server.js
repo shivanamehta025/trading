@@ -2832,13 +2832,16 @@ app.post("/api/assign-task", async (req, res) => {
 
     // ========================================================
     // DATE CONVERSION
+    // ONLY THIS PART IS CHANGED
     // ========================================================
 
     let parsedStartDate = null;
     let parsedDueDate = null;
 
     if (startDate) {
-      parsedStartDate = new Date(startDate);
+      parsedStartDate = new Date(
+        startDate.replace("T", " ") + " GMT+0530"
+      );
 
       if (isNaN(parsedStartDate.getTime())) {
         return res.status(400).json({
@@ -2849,7 +2852,9 @@ app.post("/api/assign-task", async (req, res) => {
     }
 
     if (dueDate) {
-      parsedDueDate = new Date(dueDate);
+      parsedDueDate = new Date(
+        dueDate.replace("T", " ") + " GMT+0530"
+      );
 
       if (isNaN(parsedDueDate.getTime())) {
         return res.status(400).json({
@@ -2863,7 +2868,11 @@ app.post("/api/assign-task", async (req, res) => {
     // CHECK DATE ORDER
     // ========================================================
 
-    if (parsedStartDate && parsedDueDate && parsedDueDate < parsedStartDate) {
+    if (
+      parsedStartDate &&
+      parsedDueDate &&
+      parsedDueDate < parsedStartDate
+    ) {
       return res.status(400).json({
         success: false,
         message: "Due date cannot be before start date",
@@ -2881,7 +2890,8 @@ app.post("/api/assign-task", async (req, res) => {
     // ========================================================
 
     const result =
-      await // ------------------------------------------------------
+      await
+      // ------------------------------------------------------
       // SQL INSERT
       // ------------------------------------------------------
 
@@ -2892,7 +2902,11 @@ app.post("/api/assign-task", async (req, res) => {
         // TASK TITLE
         // ------------------------------------------------------
 
-        .input("TaskTitle", sql.NVarChar(200), taskTitle.trim())
+        .input(
+          "TaskTitle",
+          sql.NVarChar(200),
+          taskTitle.trim()
+        )
 
         // ------------------------------------------------------
         // TASK DESCRIPTION
@@ -2908,49 +2922,81 @@ app.post("/api/assign-task", async (req, res) => {
         // ASSIGNED BY
         // ------------------------------------------------------
 
-        .input("AssignedBy", sql.NVarChar(100), assignedBy)
+        .input(
+          "AssignedBy",
+          sql.NVarChar(100),
+          assignedBy
+        )
 
         // ------------------------------------------------------
         // ASSIGNED TO
         // ------------------------------------------------------
 
-        .input("AssignedTo", sql.NVarChar(100), assignedTo)
+        .input(
+          "AssignedTo",
+          sql.NVarChar(100),
+          assignedTo
+        )
 
         // ------------------------------------------------------
         // START DATE
         // ------------------------------------------------------
 
-        .input("StartDate", sql.DateTime, parsedStartDate)
+        .input(
+          "StartDate",
+          sql.DateTime,
+          parsedStartDate
+        )
 
         // ------------------------------------------------------
         // DUE DATE
         // ------------------------------------------------------
 
-        .input("DueDate", sql.DateTime, parsedDueDate)
+        .input(
+          "DueDate",
+          sql.DateTime,
+          parsedDueDate
+        )
 
         // ------------------------------------------------------
         // PRIORITY
         // ------------------------------------------------------
 
-        .input("Priority", sql.NVarChar(20), priority || "Medium")
+        .input(
+          "Priority",
+          sql.NVarChar(20),
+          priority || "Medium"
+        )
 
         // ------------------------------------------------------
         // STATUS
         // ------------------------------------------------------
 
-        .input("Status", sql.NVarChar(20), status || "Pending")
+        .input(
+          "Status",
+          sql.NVarChar(20),
+          status || "Pending"
+        )
 
         // ------------------------------------------------------
         // DATABASE NAME
         // ------------------------------------------------------
 
-        .input("DatabaseName", sql.NVarChar(100), databaseName)
+        .input(
+          "DatabaseName",
+          sql.NVarChar(100),
+          databaseName
+        )
 
         // ------------------------------------------------------
         // PROPERTY CODE
         // ------------------------------------------------------
 
-        .input("PropertyCode", sql.NVarChar(20), propertyCode || null)
+        .input(
+          "PropertyCode",
+          sql.NVarChar(20),
+          propertyCode || null
+        )
 
         // ------------------------------------------------------
         // ASSIGNED PROPERTY CODE
@@ -2960,7 +3006,9 @@ app.post("/api/assign-task", async (req, res) => {
           "AssignedPropertyCode",
           sql.NVarChar(20),
           assignedPropertyCode || null,
-        ).query(`
+        )
+
+        .query(`
         INSERT INTO MA_ChatTasks
         (
           TaskId,
@@ -3008,7 +3056,9 @@ app.post("/api/assign-task", async (req, res) => {
       success: true,
       message: "Task assigned successfully",
     });
+
   } catch (err) {
+
     // ========================================================
     // ERROR
     // ========================================================
