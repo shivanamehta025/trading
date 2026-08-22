@@ -2314,81 +2314,176 @@ app.post("/api/all-users", async (req, res) => {
   try {
     const { databaseName, userId, level } = req.body;
 
+    console.log("=================================");
     console.log("ALL USERS API");
     console.log("databaseName =", databaseName);
     console.log("userId =", userId);
     console.log("level =", level);
+    console.log("=================================");
 
-    if (!databaseName || !userId || !level) {
+    // ==========================================================
+    // VALIDATION
+    // ==========================================================
+
+    if (!databaseName || !userId || level === undefined || level === null) {
       return res.status(400).json({
         success: false,
         message: "databaseName, userId, and level are required",
       });
     }
 
+    // ==========================================================
+    // DATABASE CONNECTION
+    // ==========================================================
+
     const pool = await getPool(databaseName);
+
+    // ==========================================================
+    // GET ALL USERS
+    // ==========================================================
 
     const result = await pool
       .request()
-      .input("userid", sql.VarChar, userId)
-      .input("level", sql.Int, Number(level)).query(`
-    SELECT
-        s63.UNQID AS data,
-        s63.SM63_6 AS value,
-        s61.SM61_6 AS branch
-    FROM SM63 AS s63
-    INNER JOIN SM61 AS s61
-        ON s61.UNQID = s63.SM63_8
-    WHERE EXISTS
-    (
-        SELECT 1
-        FROM dbo.split(s63.SM63_12, ',') AS user_access
-        INNER JOIN dbo.split
+
+      .input(
+        "userid",
+        sql.VarChar,
+        String(userId)
+      )
+
+      .input(
+        "level",
+        sql.Int,
+        Number(level)
+      )
+
+      .query(`
+        SELECT
+            s63.UNQID AS data,
+
+            -- EMPLOYEE NAME
+            s63.SM63_6 AS value,
+
+            -- ACTUAL BRANCH NAME
+            b.SM1002_7 AS branch
+
+        FROM SM63 AS s63
+
+        -- EMPLOYEE DESIGNATION / LEVEL
+        INNER JOIN SM61 AS s61
+            ON s61.UNQID = s63.SM63_8
+
+        -- ACTUAL BRANCH
+        LEFT JOIN SM1002 AS b
+            ON b.SM1002_5 = s63.SM63_12
+
+        WHERE EXISTS
         (
+            SELECT 1
+
+            FROM dbo.split(
+                s63.SM63_12,
+                ','
+            ) AS user_access
+
+            INNER JOIN dbo.split
             (
-                SELECT SM63_12
-                FROM SM63
-                WHERE SM63_5 = @userid
-            ),
-            ','
-        ) AS requested_access
-            ON LTRIM(RTRIM(user_access.data)) =
-               LTRIM(RTRIM(requested_access.data))
-    )
-    AND
-    (
-        CASE
-            WHEN @level = (
-                SELECT MAX(TRY_CONVERT(INT, SM61_9))
-                FROM SM61
-            )
-            THEN
-                CASE
-                    WHEN TRY_CONVERT(INT, s61.SM61_9) > @level
-                        THEN 1
-                    ELSE 0
-                END
-            ELSE
-                CASE
-                    WHEN TRY_CONVERT(INT, s61.SM61_9) >= @level
-                        THEN 1
-                    ELSE 0
-                END
-        END
-    ) = 1
-    ORDER BY s63.SM63_6;
-  `);
+                (
+                    SELECT SM63_12
 
-    console.log("ALL USERS RESULT =", result.recordset);
+                    FROM SM63
 
-    res.json({
+                    WHERE SM63_5 = @userid
+                ),
+                ','
+            ) AS requested_access
+
+                ON LTRIM(RTRIM(user_access.data)) =
+                   LTRIM(RTRIM(requested_access.data))
+        )
+
+        AND
+        (
+            CASE
+
+                -- ==================================================
+                -- HIGHEST LEVEL USER
+                -- ==================================================
+
+                WHEN @level = (
+                    SELECT MAX(
+                        TRY_CONVERT(
+                            INT,
+                            SM61_9
+                        )
+                    )
+
+                    FROM SM61
+                )
+
+                THEN
+                    CASE
+                        WHEN TRY_CONVERT(
+                            INT,
+                            s61.SM61_9
+                        ) > @level
+                        THEN 1
+
+                        ELSE 0
+                    END
+
+                -- ==================================================
+                -- NORMAL LEVEL USER
+                -- ==================================================
+
+                ELSE
+                    CASE
+                        WHEN TRY_CONVERT(
+                            INT,
+                            s61.SM61_9
+                        ) >= @level
+                        THEN 1
+
+                        ELSE 0
+                    END
+            END
+        ) = 1
+
+        ORDER BY
+            s63.SM63_6;
+      `);
+
+    // ==========================================================
+    // LOG RESULT
+    // ==========================================================
+
+    console.log(
+      "ALL USERS RESULT COUNT =",
+      result.recordset.length
+    );
+
+    console.log(
+      "ALL USERS RESULT =",
+      result.recordset
+    );
+
+    // ==========================================================
+    // RESPONSE
+    // ==========================================================
+
+    return res.status(200).json({
       success: true,
       data: result.recordset,
     });
-  } catch (err) {
-    console.log("ALL USERS ERROR =", err);
 
-    res.status(500).json({
+  } catch (err) {
+
+    console.log("=================================");
+    console.log("ALL USERS ERROR");
+    console.log(err);
+    console.log("=================================");
+
+    return res.status(500).json({
       success: false,
       message: err.message,
     });
