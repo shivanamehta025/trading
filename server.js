@@ -2331,53 +2331,53 @@ app.post("/api/all-users", async (req, res) => {
     const result = await pool
       .request()
       .input("userid", sql.VarChar, userId)
-      .input("level", sql.Int, Number(level))
-      .query(`
-SELECT
-    s63.UNQID AS data,
-    s63.SM63_6 AS value
-FROM SM63 AS s63
-INNER JOIN SM61 AS s61
-    ON s61.UNQID = s63.SM63_8
-WHERE EXISTS
-(
-    SELECT 1
-    FROM dbo.split(s63.SM63_12, ',') AS user_access
-    INNER JOIN dbo.split
+      .input("level", sql.Int, Number(level)).query(`
+    SELECT
+        s63.UNQID AS data,
+        s63.SM63_6 AS value,
+        s61.SM61_6 AS branch
+    FROM SM63 AS s63
+    INNER JOIN SM61 AS s61
+        ON s61.UNQID = s63.SM63_8
+    WHERE EXISTS
     (
+        SELECT 1
+        FROM dbo.split(s63.SM63_12, ',') AS user_access
+        INNER JOIN dbo.split
         (
-            SELECT SM63_12
-            FROM SM63
-            WHERE SM63_5 = @userid
-        ),
-        ','
-    ) AS requested_access
-        ON LTRIM(RTRIM(user_access.data)) =
-           LTRIM(RTRIM(requested_access.data))
-)
-AND
-(
-    CASE
-        WHEN @level = (
-            SELECT MAX(TRY_CONVERT(INT, SM61_9))
-            FROM SM61
-        )
-        THEN
-            CASE
-                WHEN TRY_CONVERT(INT, s61.SM61_9) > @level
-                    THEN 1
-                ELSE 0
-            END
-        ELSE
-            CASE
-                WHEN TRY_CONVERT(INT, s61.SM61_9) >= @level
-                    THEN 1
-                ELSE 0
-            END
-    END
-) = 1
-ORDER BY s63.SM63_6;
-      `);
+            (
+                SELECT SM63_12
+                FROM SM63
+                WHERE SM63_5 = @userid
+            ),
+            ','
+        ) AS requested_access
+            ON LTRIM(RTRIM(user_access.data)) =
+               LTRIM(RTRIM(requested_access.data))
+    )
+    AND
+    (
+        CASE
+            WHEN @level = (
+                SELECT MAX(TRY_CONVERT(INT, SM61_9))
+                FROM SM61
+            )
+            THEN
+                CASE
+                    WHEN TRY_CONVERT(INT, s61.SM61_9) > @level
+                        THEN 1
+                    ELSE 0
+                END
+            ELSE
+                CASE
+                    WHEN TRY_CONVERT(INT, s61.SM61_9) >= @level
+                        THEN 1
+                    ELSE 0
+                END
+        END
+    ) = 1
+    ORDER BY s63.SM63_6;
+  `);
 
     console.log("ALL USERS RESULT =", result.recordset);
 
@@ -2385,7 +2385,6 @@ ORDER BY s63.SM63_6;
       success: true,
       data: result.recordset,
     });
-
   } catch (err) {
     console.log("ALL USERS ERROR =", err);
 
