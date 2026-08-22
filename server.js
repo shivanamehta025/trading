@@ -3031,9 +3031,18 @@ app.post("/api/assign-task", async (req, res) => {
 // TASK DASHBOARD
 // ============================================================
 
+// ============================================================
+// TASK DASHBOARD
+// ============================================================
+
 app.post("/api/task-dashboard", async (req, res) => {
   try {
-    const { databaseName, userId, viewType = "All" } = req.body;
+
+    const {
+      databaseName,
+      userId,
+      viewType = "All"
+    } = req.body;
 
     console.log("=================================");
     console.log("TASK DASHBOARD API");
@@ -3042,6 +3051,7 @@ app.post("/api/task-dashboard", async (req, res) => {
     console.log("viewType =", viewType);
     console.log("=================================");
 
+
     // ==========================================================
     // VALIDATION
     // ==========================================================
@@ -3049,16 +3059,17 @@ app.post("/api/task-dashboard", async (req, res) => {
     if (!databaseName) {
       return res.status(400).json({
         success: false,
-        message: "databaseName is required",
+        message: "databaseName is required"
       });
     }
 
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: "userId is required",
+        message: "userId is required"
       });
     }
+
 
     // ==========================================================
     // DATABASE CONNECTION
@@ -3066,48 +3077,76 @@ app.post("/api/task-dashboard", async (req, res) => {
 
     const pool = await getPool(databaseName);
 
+
     // ==========================================================
     // GET LOGGED-IN EMPLOYEE
     // ==========================================================
 
     const employeeResult = await pool
       .request()
-      .input("UserId", sql.NVarChar(100), String(userId)).query(`
+      .input(
+        "UserId",
+        sql.NVarChar(100),
+        String(userId)
+      )
+      .query(`
         SELECT TOP 1
+
           UNQID,
+
           SM63_5 AS UserId,
+
           SM63_6 AS UserName
+
         FROM SM63
+
         WHERE SM63_5 = @UserId
       `);
 
-    const loggedInEmployee = employeeResult.recordset[0];
 
-    console.log("LOGGED-IN EMPLOYEE =", loggedInEmployee);
+    const loggedInEmployee =
+      employeeResult.recordset[0];
+
+
+    console.log(
+      "LOGGED-IN EMPLOYEE =",
+      loggedInEmployee
+    );
+
 
     if (!loggedInEmployee) {
+
       return res.status(404).json({
         success: false,
-        message: "Logged-in user not found in SM63",
+        message: "Logged-in user not found in SM63"
       });
+
     }
 
+
     // ==========================================================
-    // IMPORTANT
-    //
-    // SM63.UNQID = uniqueidentifier
-    // MA_ChatTasks.AssignedTo = nvarchar
-    //
-    // Therefore convert UNQID to string.
+    // EMPLOYEE UNIQUE ID
     // ==========================================================
 
-    const employeeUnqId = String(loggedInEmployee.UNQID);
+    const employeeUnqId =
+      String(loggedInEmployee.UNQID);
 
-    console.log("LOGGED-IN USER ID =", userId);
 
-    console.log("LOGGED-IN EMPLOYEE UNQID =", employeeUnqId);
+    console.log(
+      "LOGGED-IN USER ID =",
+      userId
+    );
 
-    console.log("LOGGED-IN USER NAME =", loggedInEmployee.UserName);
+    console.log(
+      "LOGGED-IN EMPLOYEE UNQID =",
+      employeeUnqId
+    );
+
+    console.log(
+      "LOGGED-IN USER NAME =",
+      loggedInEmployee.UserName
+    );
+
 
     // ==========================================================
     // WHERE CONDITION
@@ -3115,43 +3154,63 @@ app.post("/api/task-dashboard", async (req, res) => {
 
     let whereCondition = "";
 
+
     // ----------------------------------------------------------
     // INDIVIDUAL
     // ----------------------------------------------------------
 
     if (viewType === "Individual") {
+
       whereCondition = `
         WHERE
           T.AssignedTo = @EmployeeUnqId
       `;
+
     }
+
 
     // ----------------------------------------------------------
     // GROUP
     // ----------------------------------------------------------
+
     else if (viewType === "Group") {
+
       whereCondition = `
         WHERE
           T.AssignedBy = @UserId
-          AND T.AssignedTo <> @EmployeeUnqId
+
+          AND
+
+          T.AssignedTo <> @EmployeeUnqId
       `;
+
     }
+
 
     // ----------------------------------------------------------
     // ALL
     // ----------------------------------------------------------
+
     else {
+
       whereCondition = `
         WHERE
+
           T.AssignedBy = @UserId
 
           OR
 
           T.AssignedTo = @EmployeeUnqId
       `;
+
     }
 
-    console.log("WHERE CONDITION =", whereCondition);
+
+    console.log(
+      "WHERE CONDITION =",
+      whereCondition
+    );
+
 
     // ==========================================================
     // GET TASKS
@@ -3160,12 +3219,20 @@ app.post("/api/task-dashboard", async (req, res) => {
     const result = await pool
       .request()
 
-      // USER ID
-      .input("UserId", sql.NVarChar(100), String(userId))
+      .input(
+        "UserId",
+        sql.NVarChar(100),
+        String(userId)
+      )
 
-      // IMPORTANT:
-      // AssignedTo is NVARCHAR in MA_ChatTasks
-      .input("EmployeeUnqId", sql.NVarChar(100), employeeUnqId).query(`
+      .input(
+        "EmployeeUnqId",
+        sql.NVarChar(100),
+        employeeUnqId
+      )
+
+      .query(`
+
         SELECT
 
           -- ==================================================
@@ -3174,6 +3241,7 @@ app.post("/api/task-dashboard", async (req, res) => {
 
           T.TaskId,
 
+
           -- ==================================================
           -- TASK INFORMATION
           -- ==================================================
@@ -3181,6 +3249,7 @@ app.post("/api/task-dashboard", async (req, res) => {
           T.TaskTitle,
 
           T.TaskDescription,
+
 
           -- ==================================================
           -- ASSIGNED BY
@@ -3193,6 +3262,7 @@ app.post("/api/task-dashboard", async (req, res) => {
             T.AssignedBy
           ) AS AssignedByName,
 
+
           -- ==================================================
           -- ASSIGNED TO
           -- ==================================================
@@ -3204,6 +3274,7 @@ app.post("/api/task-dashboard", async (req, res) => {
             T.AssignedTo
           ) AS AssignedToName,
 
+
           -- ==================================================
           -- DATES
           -- ==================================================
@@ -3212,29 +3283,34 @@ app.post("/api/task-dashboard", async (req, res) => {
 
           T.DueDate,
 
+
           -- ==================================================
           -- TASK STATUS
           -- ==================================================
 
-        T.Priority,
+          T.Priority,
 
-T.Status,
+          T.Status,
 
-T.CreatedDate,
+          T.CreatedDate,
 
-// ==================================================
-// FINAL APPROVAL
-// ==================================================
 
-T.FinalApprovalDateTime,
+          -- ==================================================
+          -- FINAL APPROVAL
+          -- ==================================================
 
-T.FinalApprovedBy,
+          T.FinalApprovalDateTime,
 
-// ==================================================
-// DATABASE
-// ==================================================
+          T.FinalApprovedBy,
 
-T.DatabaseName,
+
+          -- ==================================================
+          -- DATABASE
+          -- ==================================================
+
+          T.DatabaseName,
+
+
           -- ==================================================
           -- PROPERTY
           -- ==================================================
@@ -3243,6 +3319,7 @@ T.DatabaseName,
 
           T.AssignedPropertyCode,
 
+
           -- ==================================================
           -- OVERDUE
           -- ==================================================
@@ -3250,15 +3327,20 @@ T.DatabaseName,
           CASE
 
             WHEN
+
               T.Status NOT IN (
                 'Completed',
                 'Cancelled'
               )
 
-              AND T.DueDate IS NOT NULL
+              AND
 
-              AND CAST(T.DueDate AS DATE)
-                  < CAST(GETDATE() AS DATE)
+              T.DueDate IS NOT NULL
+
+              AND
+
+              CAST(T.DueDate AS DATE)
+                < CAST(GETDATE() AS DATE)
 
             THEN 1
 
@@ -3266,35 +3348,37 @@ T.DatabaseName,
 
           END AS IsOverdue
 
+
         FROM MA_ChatTasks T
+
 
         -- ====================================================
         -- ASSIGNED BY
         -- ====================================================
 
         LEFT JOIN SM63 AB
+
           ON AB.SM63_5 = T.AssignedBy
+
 
         -- ====================================================
         -- ASSIGNED TO
-        --
-        -- SM63.UNQID = uniqueidentifier
-        -- MA_ChatTasks.AssignedTo = nvarchar
-        --
-        -- Convert GUID to string for comparison.
         -- ====================================================
 
         LEFT JOIN SM63 AT
+
           ON CONVERT(
                NVARCHAR(100),
                AT.UNQID
              ) = T.AssignedTo
+
 
         -- ====================================================
         -- FILTER
         -- ====================================================
 
         ${whereCondition}
+
 
         -- ====================================================
         -- ORDER
@@ -3323,37 +3407,60 @@ T.DatabaseName,
           T.DueDate ASC,
 
           T.CreatedDate DESC
+
       `);
+
 
     // ==========================================================
     // TASK DATA
     // ==========================================================
 
-    const tasks = result.recordset;
+    const tasks =
+      result.recordset;
+
 
     // ==========================================================
     // SUMMARY
     // ==========================================================
 
-    const total = tasks.length;
+    const total =
+      tasks.length;
 
-    const pending = tasks.filter(
-      (x) => String(x.Status).toLowerCase() === "pending",
-    ).length;
 
-    const inProgress = tasks.filter(
-      (x) => String(x.Status).toLowerCase() === "in progress",
-    ).length;
+    const pending =
+      tasks.filter(
+        (x) =>
+          String(x.Status).toLowerCase() === "pending"
+      ).length;
 
-    const completed = tasks.filter(
-      (x) => String(x.Status).toLowerCase() === "completed",
-    ).length;
 
-    const cancelled = tasks.filter(
-      (x) => String(x.Status).toLowerCase() === "cancelled",
-    ).length;
+    const inProgress =
+      tasks.filter(
+        (x) =>
+          String(x.Status).toLowerCase() === "in progress"
+      ).length;
 
-    const overdue = tasks.filter((x) => Number(x.IsOverdue) === 1).length;
+
+    const completed =
+      tasks.filter(
+        (x) =>
+          String(x.Status).toLowerCase() === "completed"
+      ).length;
+
+
+    const cancelled =
+      tasks.filter(
+        (x) =>
+          String(x.Status).toLowerCase() === "cancelled"
+      ).length;
+
+
+    const overdue =
+      tasks.filter(
+        (x) =>
+          Number(x.IsOverdue) === 1
+      ).length;
+
 
     // ==========================================================
     // LOG
@@ -3361,53 +3468,128 @@ T.DatabaseName,
 
     console.log("=================================");
     console.log("TASK DASHBOARD RESULT");
-    console.log("USER ID =", userId);
-    console.log("EMPLOYEE UNQID =", employeeUnqId);
-    console.log("USER NAME =", loggedInEmployee.UserName);
+
+    console.log(
+      "USER ID =",
+      userId
+    );
+
+    console.log(
+      "EMPLOYEE UNQID =",
+      employeeUnqId
+    );
+
+    console.log(
+      "USER NAME =",
+      loggedInEmployee.UserName
+    );
+
     console.log("---------------------------------");
-    console.log("TOTAL =", total);
-    console.log("PENDING =", pending);
-    console.log("IN PROGRESS =", inProgress);
-    console.log("COMPLETED =", completed);
-    console.log("CANCELLED =", cancelled);
-    console.log("OVERDUE =", overdue);
+
+    console.log(
+      "TOTAL =",
+      total
+    );
+
+    console.log(
+      "PENDING =",
+      pending
+    );
+
+    console.log(
+      "IN PROGRESS =",
+      inProgress
+    );
+
+    console.log(
+      "COMPLETED =",
+      completed
+    );
+
+    console.log(
+      "CANCELLED =",
+      cancelled
+    );
+
+    console.log(
+      "OVERDUE =",
+      overdue
+    );
+
     console.log("=================================");
+
 
     // ==========================================================
     // RESPONSE
     // ==========================================================
 
     return res.status(200).json({
+
       success: true,
 
+
       loggedInUser: {
+
         userId: userId,
-        employeeUnqId: employeeUnqId,
-        userName: loggedInEmployee.UserName,
+
+        employeeUnqId:
+          employeeUnqId,
+
+        userName:
+          loggedInEmployee.UserName
+
       },
+
 
       summary: {
+
         total: total,
+
         pending: pending,
+
         inProgress: inProgress,
+
         completed: completed,
+
         cancelled: cancelled,
-        overdue: overdue,
+
+        overdue: overdue
+
       },
 
-      data: tasks,
+
+      data: tasks
+
     });
+
+
   } catch (err) {
-    console.error("=================================");
-    console.error("TASK DASHBOARD ERROR");
+
+    console.error(
+      "================================="
+    );
+
+    console.error(
+      "TASK DASHBOARD ERROR"
+    );
+
     console.error(err);
-    console.error("=================================");
+
+    console.error(
+      "================================="
+    );
+
 
     return res.status(500).json({
+
       success: false,
-      message: err.message,
+
+      message: err.message
+
     });
+
   }
+
 });
 
 app.post("/api/update-task-status", async (req, res) => {
