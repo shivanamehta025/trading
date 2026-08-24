@@ -3830,8 +3830,13 @@ app.post("/api/category-best-month-customers", async (req, res) => {
   }
 });
 
+// ============================================================
+// ASSIGN TASK
+// ============================================================
+
 app.post("/api/assign-task", async (req, res) => {
   try {
+
     const {
       databaseName,
       taskTitle,
@@ -3845,6 +3850,7 @@ app.post("/api/assign-task", async (req, res) => {
       propertyCode,
       assignedPropertyCode,
     } = req.body;
+
 
     // ========================================================
     // LOG REQUEST
@@ -3864,6 +3870,7 @@ app.post("/api/assign-task", async (req, res) => {
     console.log("propertyCode =", propertyCode);
     console.log("assignedPropertyCode =", assignedPropertyCode);
     console.log("=================================");
+
 
     // ========================================================
     // VALIDATION
@@ -3897,20 +3904,25 @@ app.post("/api/assign-task", async (req, res) => {
       });
     }
 
+
     // ========================================================
     // DATE VALIDATION
-    // IMPORTANT:
-    // Do NOT use new Date() here.
-    // Keep the date/time as a local SQL datetime string.
     // ========================================================
 
     let parsedStartDate = null;
     let parsedDueDate = null;
 
     if (startDate) {
-      parsedStartDate = String(startDate).replace("T", " ").substring(0, 19);
 
-      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(parsedStartDate)) {
+      parsedStartDate = String(startDate)
+        .replace("T", " ")
+        .substring(0, 19);
+
+      if (
+        !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(
+          parsedStartDate
+        )
+      ) {
         return res.status(400).json({
           success: false,
           message: "Invalid startDate",
@@ -3918,10 +3930,18 @@ app.post("/api/assign-task", async (req, res) => {
       }
     }
 
-    if (dueDate) {
-      parsedDueDate = String(dueDate).replace("T", " ").substring(0, 19);
 
-      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(parsedDueDate)) {
+    if (dueDate) {
+
+      parsedDueDate = String(dueDate)
+        .replace("T", " ")
+        .substring(0, 19);
+
+      if (
+        !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(
+          parsedDueDate
+        )
+      ) {
         return res.status(400).json({
           success: false,
           message: "Invalid dueDate",
@@ -3929,114 +3949,128 @@ app.post("/api/assign-task", async (req, res) => {
       }
     }
 
+
     // ========================================================
     // CHECK DATE ORDER
     // ========================================================
 
-    if (parsedStartDate && parsedDueDate && parsedDueDate < parsedStartDate) {
+    if (
+      parsedStartDate &&
+      parsedDueDate &&
+      parsedDueDate < parsedStartDate
+    ) {
       return res.status(400).json({
         success: false,
         message: "Due date cannot be before start date",
       });
     }
 
+
     // ========================================================
-    // GET DATABASE CONNECTION
+    // DATABASE CONNECTION
     // ========================================================
 
     const pool = await getPool(databaseName);
+
+
+    // ========================================================
+    // GENERATE TASK ID FIRST
+    // ========================================================
+    //
+    // IMPORTANT:
+    // Previously SQL was using NEWID() inside INSERT.
+    //
+    // Now we generate the ID here so that we can use the
+    // SAME TaskId in APP_CHAT_TASK_PIN.
+    //
+    // ========================================================
+
+    const taskId = require("crypto").randomUUID();
+
+    console.log("GENERATED TASK ID =", taskId);
+
 
     // ========================================================
     // INSERT TASK
     // ========================================================
 
-    const result =
-      await // ------------------------------------------------------
-      // SQL INSERT
-      // ------------------------------------------------------
+    const result = await pool
+      .request()
 
-      // ------------------------------------------------------
-      // SQL QUERY
-      // ------------------------------------------------------
+      .input(
+        "TaskId",
+        sql.UniqueIdentifier,
+        taskId
+      )
 
-      pool
-        .request()
+      .input(
+        "TaskTitle",
+        sql.NVarChar(200),
+        taskTitle.trim()
+      )
 
-        // ------------------------------------------------------
-        // TASK TITLE
-        // ------------------------------------------------------
+      .input(
+        "TaskDescription",
+        sql.NVarChar(sql.MAX),
+        taskDescription || null
+      )
 
-        .input("TaskTitle", sql.NVarChar(200), taskTitle.trim())
+      .input(
+        "AssignedBy",
+        sql.NVarChar(100),
+        assignedBy
+      )
 
-        // ------------------------------------------------------
-        // TASK DESCRIPTION
-        // ------------------------------------------------------
+      .input(
+        "AssignedTo",
+        sql.NVarChar(100),
+        assignedTo
+      )
 
-        .input(
-          "TaskDescription",
-          sql.NVarChar(sql.MAX),
-          taskDescription || null,
-        )
+      .input(
+        "StartDate",
+        sql.NVarChar(19),
+        parsedStartDate
+      )
 
-        // ------------------------------------------------------
-        // ASSIGNED BY
-        // ------------------------------------------------------
+      .input(
+        "DueDate",
+        sql.NVarChar(19),
+        parsedDueDate
+      )
 
-        .input("AssignedBy", sql.NVarChar(100), assignedBy)
+      .input(
+        "Priority",
+        sql.NVarChar(20),
+        priority || "Medium"
+      )
 
-        // ------------------------------------------------------
-        // ASSIGNED TO
-        // ------------------------------------------------------
+      .input(
+        "Status",
+        sql.NVarChar(20),
+        status || "Pending"
+      )
 
-        .input("AssignedTo", sql.NVarChar(100), assignedTo)
+      .input(
+        "DatabaseName",
+        sql.NVarChar(100),
+        databaseName
+      )
 
-        // ------------------------------------------------------
-        // START DATE
-        // Keep as string to avoid timezone conversion
-        // ------------------------------------------------------
+      .input(
+        "PropertyCode",
+        sql.NVarChar(20),
+        propertyCode || null
+      )
 
-        .input("StartDate", sql.NVarChar(19), parsedStartDate)
+      .input(
+        "AssignedPropertyCode",
+        sql.NVarChar(20),
+        assignedPropertyCode || null
+      )
 
-        // ------------------------------------------------------
-        // DUE DATE
-        // Keep as string to avoid timezone conversion
-        // ------------------------------------------------------
+      .query(`
 
-        .input("DueDate", sql.NVarChar(19), parsedDueDate)
-
-        // ------------------------------------------------------
-        // PRIORITY
-        // ------------------------------------------------------
-
-        .input("Priority", sql.NVarChar(20), priority || "Medium")
-
-        // ------------------------------------------------------
-        // STATUS
-        // ------------------------------------------------------
-
-        .input("Status", sql.NVarChar(20), status || "Pending")
-
-        // ------------------------------------------------------
-        // DATABASE NAME
-        // ------------------------------------------------------
-
-        .input("DatabaseName", sql.NVarChar(100), databaseName)
-
-        // ------------------------------------------------------
-        // PROPERTY CODE
-        // ------------------------------------------------------
-
-        .input("PropertyCode", sql.NVarChar(20), propertyCode || null)
-
-        // ------------------------------------------------------
-        // ASSIGNED PROPERTY CODE
-        // ------------------------------------------------------
-
-        .input(
-          "AssignedPropertyCode",
-          sql.NVarChar(20),
-          assignedPropertyCode || null,
-        ).query(`
         INSERT INTO MA_ChatTasks
         (
           TaskId,
@@ -4054,9 +4088,10 @@ app.post("/api/assign-task", async (req, res) => {
           AssignedPropertyCode,
           IsRead
         )
+
         VALUES
         (
-          NEWID(),
+          @TaskId,
           @TaskTitle,
           @TaskDescription,
           @AssignedBy,
@@ -4071,33 +4106,284 @@ app.post("/api/assign-task", async (req, res) => {
           @DatabaseName,
           @PropertyCode,
           @AssignedPropertyCode,
+
           0
         )
+
       `);
+
+
+    console.log("TASK INSERTED SUCCESSFULLY");
+    console.log("TASK ID =", taskId);
+    console.log("INSERTED ROW COUNT =", result.rowsAffected);
+
+
+    // ========================================================
+    // GET ASSIGNEE LOGIN USER ID
+    // ========================================================
+    //
+    // assignedTo is currently the employee UNQID.
+    //
+    // Chat uses SM63_5 (login/user ID).
+    //
+    // Therefore:
+    //
+    // assignedTo UNQID
+    //       ↓
+    // SM63.UNQID
+    //       ↓
+    // SM63_5
+    //
+    // ========================================================
+
+    const assigneeResult = await pool
+      .request()
+
+      .input(
+        "AssignedTo",
+        sql.NVarChar(100),
+        String(assignedTo)
+      )
+
+      .query(`
+
+        SELECT TOP 1
+          UNQID,
+          SM63_5 AS UserID,
+          SM63_6 AS UserName
+
+        FROM SM63
+
+        WHERE CONVERT(NVARCHAR(100), UNQID) = @AssignedTo
+
+      `);
+
+
+    const assignee = assigneeResult.recordset[0];
+
+
+    if (!assignee) {
+
+      console.log(
+        "WARNING: ASSIGNEE NOT FOUND IN SM63"
+      );
+
+    } else {
+
+      console.log(
+        "ASSIGNEE USER ID =",
+        assignee.UserID
+      );
+
+      console.log(
+        "ASSIGNEE NAME =",
+        assignee.UserName
+      );
+
+
+      // ======================================================
+      // CREATE CHAT REFERENCE ID
+      // ======================================================
+
+      const chatUsers = [
+        String(assignedBy),
+        String(assignee.UserID),
+      ].sort();
+
+      const referenceId = chatUsers.join("_");
+
+
+      console.log(
+        "CHAT REFERENCE ID =",
+        referenceId
+      );
+
+
+      // ======================================================
+      // CREATE PINNED TASK TEXT
+      // ======================================================
+
+      const pinnedTaskText =
+        `📌 Task: ${taskTitle.trim()}` +
+        `${taskDescription && taskDescription.trim()
+          ? `\n📝 ${taskDescription.trim()}`
+          : ""}` +
+        `${parsedDueDate
+          ? `\n📅 Due: ${parsedDueDate}`
+          : ""}` +
+        `\n🔖 Status: ${status || "Pending"}` +
+        `\n⚡ Priority: ${priority || "Medium"}`;
+
+
+      console.log(
+        "PINNED TASK TEXT =",
+        pinnedTaskText
+      );
+
+
+      // ======================================================
+      // AUTOMATICALLY PIN TASK IN CHAT
+      // ======================================================
+
+      await pool
+        .request()
+
+        .input(
+          "REFERENCEID",
+          sql.VarChar(255),
+          referenceId
+        )
+
+        .input(
+          "TASKID",
+          sql.VarChar(100),
+          taskId
+        )
+
+        .input(
+          "TASKTEXT",
+          sql.NVarChar(sql.MAX),
+          pinnedTaskText
+        )
+
+        .input(
+          "FROMUSER",
+          sql.VarChar(100),
+          String(assignedBy)
+        )
+
+        .input(
+          "TOUSER",
+          sql.VarChar(100),
+          String(assignee.UserID)
+        )
+
+        .query(`
+
+          IF EXISTS
+          (
+            SELECT 1
+
+            FROM APP_CHAT_TASK_PIN
+
+            WHERE REFERENCEID = @REFERENCEID
+              AND TASKID = @TASKID
+          )
+
+          BEGIN
+
+            UPDATE APP_CHAT_TASK_PIN
+
+            SET
+              TASKTEXT = @TASKTEXT,
+              UPDATEDON = GETDATE()
+
+            WHERE REFERENCEID = @REFERENCEID
+              AND TASKID = @TASKID;
+
+          END
+
+          ELSE
+
+          BEGIN
+
+            INSERT INTO APP_CHAT_TASK_PIN
+            (
+              REFERENCEID,
+              TASKID,
+              TASKTEXT,
+              FROMUSER,
+              TOUSER,
+              CREATEDON,
+              UPDATEDON
+            )
+
+            VALUES
+            (
+              @REFERENCEID,
+              @TASKID,
+              @TASKTEXT,
+              @FROMUSER,
+              @TOUSER,
+              GETDATE(),
+              GETDATE()
+            );
+
+          END
+
+        `);
+
+
+      console.log(
+        "================================="
+      );
+
+      console.log(
+        "TASK AUTOMATICALLY PINNED IN CHAT"
+      );
+
+      console.log(
+        "TASK ID =",
+        taskId
+      );
+
+      console.log(
+        "FROM USER =",
+        assignedBy
+      );
+
+      console.log(
+        "TO USER =",
+        assignee.UserID
+      );
+
+      console.log(
+        "REFERENCE ID =",
+        referenceId
+      );
+
+      console.log(
+        "================================="
+      );
+    }
+
 
     // ========================================================
     // SUCCESS
     // ========================================================
 
-    console.log("TASK INSERTED SUCCESSFULLY");
-    console.log("INSERTED ROW COUNT =", result.rowsAffected);
-
     return res.status(200).json({
-      success: true,
-      message: "Task assigned successfully",
-    });
-  } catch (err) {
-    // ========================================================
-    // ERROR
-    // ========================================================
 
-    console.error("=================================");
-    console.error("ASSIGN TASK ERROR =", err);
-    console.error("=================================");
+      success: true,
+
+      message: "Task assigned successfully",
+
+      taskId: taskId,
+
+    });
+
+
+  } catch (err) {
+
+    console.error(
+      "================================="
+    );
+
+    console.error(
+      "ASSIGN TASK ERROR =",
+      err
+    );
+
+    console.error(
+      "================================="
+    );
 
     return res.status(500).json({
+
       success: false,
+
       message: err.message,
+
     });
   }
 });
