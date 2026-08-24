@@ -291,4 +291,56 @@ router.post("/get-customer-outstanding", async (req, res) => {
     }
 });
 
+router.post("/customer-call-history", async (req, res) => {
+    try {
+
+        const {
+            databaseName,
+            customerUnq
+        } = req.body;
+
+        if (!databaseName || !customerUnq) {
+            return res.status(400).json({
+                success: false,
+                message: "databaseName and customerUnq are required"
+            });
+        }
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+
+            .input(
+                "WHAT",
+                sql.VarChar(50),
+                "GET_CUSTOMER_CALLS"
+            )
+
+            .input(
+                "CUSTOMERUNQ",
+                sql.UniqueIdentifier,
+                customerUnq
+            )
+
+            .execute("A_SP_SALES_CALL");
+
+        res.json({
+            success: true,
+            calls: result.recordset
+        });
+
+    } catch (error) {
+
+        console.error(
+            "CUSTOMER CALL HISTORY ERROR:",
+            error
+        );
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 module.exports = router;
