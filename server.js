@@ -4345,6 +4345,159 @@ MAX(CREATEDON) DESC
 res.json(result.recordset);
 
 });
+// ==========================================================
+// PIN TASK IN CHAT
+// ==========================================================
+
+app.post("/api/pin-chat-task", async (req, res) => {
+  try {
+    const { databaseName, referenceId, taskId, taskText, fromUser, toUser } =
+      req.body;
+
+    if (
+      !databaseName ||
+      !referenceId ||
+      !taskId ||
+      !taskText ||
+      !fromUser ||
+      !toUser
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "databaseName, referenceId, taskId, taskText, fromUser and toUser are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    // ======================================================
+    // INSERT OR UPDATE
+    // ======================================================
+
+    await pool
+      .request()
+
+      .input("REFERENCEID", sql.VarChar(255), referenceId)
+
+      .input("TASKID", sql.VarChar(100), taskId)
+
+      .input("TASKTEXT", sql.NVarChar(sql.MAX), taskText)
+
+      .input("FROMUSER", sql.VarChar(100), fromUser)
+
+      .input("TOUSER", sql.VarChar(100), toUser).query(`
+        IF EXISTS
+        (
+          SELECT 1
+          FROM APP_CHAT_TASK_PIN
+          WHERE REFERENCEID = @REFERENCEID
+            AND TASKID = @TASKID
+        )
+        BEGIN
+
+          UPDATE APP_CHAT_TASK_PIN
+
+          SET
+            TASKTEXT = @TASKTEXT,
+            UPDATEDON = GETDATE()
+
+          WHERE REFERENCEID = @REFERENCEID
+            AND TASKID = @TASKID;
+
+        END
+        ELSE
+        BEGIN
+
+          INSERT INTO APP_CHAT_TASK_PIN
+          (
+            REFERENCEID,
+            TASKID,
+            TASKTEXT,
+            FROMUSER,
+            TOUSER,
+            CREATEDON,
+            UPDATEDON
+          )
+
+          VALUES
+          (
+            @REFERENCEID,
+            @TASKID,
+            @TASKTEXT,
+            @FROMUSER,
+            @TOUSER,
+            GETDATE(),
+            GETDATE()
+          );
+
+        END
+      `);
+
+    res.json({
+      success: true,
+      message: "Task pinned successfully",
+    });
+  } catch (err) {
+    console.log("PIN CHAT TASK ERROR =", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ==========================================================
+// GET PINNED TASKS FOR CHAT
+// ==========================================================
+
+app.post("/api/get-chat-pins", async (req, res) => {
+  try {
+    const { databaseName, referenceId } = req.body;
+
+    if (!databaseName || !referenceId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and referenceId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+
+      .input("REFERENCEID", sql.VarChar(255), referenceId).query(`
+        SELECT
+          PINID,
+          REFERENCEID,
+          TASKID,
+          TASKTEXT,
+          FROMUSER,
+          TOUSER,
+          CREATEDON,
+          UPDATEDON
+
+        FROM APP_CHAT_TASK_PIN
+
+        WHERE REFERENCEID = @REFERENCEID
+
+        ORDER BY CREATEDON DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.log("GET CHAT PINS ERROR =", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 
 /* app.post("/api/all-users", async (req, res) => {
 
