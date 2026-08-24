@@ -123,7 +123,7 @@ router.post("/price-enquiry", async (req, res) => {
 
             .input(
                 "USERUNQ",
-                sql.UniqueIdentifier,
+                 sql.NVarChar(50),
                 userId
             )
 
@@ -409,7 +409,7 @@ router.post("/price-enquiry", async (req, res) => {
 
                 .input(
                     "USERUNQ",
-                    sql.UniqueIdentifier,
+                     sql.NVarChar(50),
                     userId
                 )
 
