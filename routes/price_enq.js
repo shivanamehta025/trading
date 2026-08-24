@@ -34,13 +34,6 @@ router.post("/get-products_price", async (req, res) => {
                 sql.VarChar(50),
                 "GET_PRODUCTS"
             )
-
-            .input(
-                "USERID",
-                sql.NVarChar(20),
-                userId
-            )
-
             .execute("A_SP_PRICE_ENQUIRY");
 
         res.json({
