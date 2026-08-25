@@ -4705,29 +4705,33 @@ AT.SM63_5 AS AssignedToUserId,
         -- ORDER
         -- ====================================================
 
-        ORDER BY
+       ORDER BY
 
-          CASE
+    -- TODAY FIRST
+    CASE
+        WHEN T.DueDate IS NOT NULL
+             AND CAST(T.DueDate AS DATE) = CAST(GETDATE() AS DATE)
+            THEN 0
 
-            WHEN T.Status = 'Pending'
-              THEN 1
+        -- FUTURE DATES SECOND
+        WHEN T.DueDate IS NOT NULL
+             AND CAST(T.DueDate AS DATE) > CAST(GETDATE() AS DATE)
+            THEN 1
 
-            WHEN T.Status = 'In Progress'
-              THEN 2
+        -- PAST / OVERDUE DATES LAST
+        WHEN T.DueDate IS NOT NULL
+             AND CAST(T.DueDate AS DATE) < CAST(GETDATE() AS DATE)
+            THEN 2
 
-            WHEN T.Status = 'Completed'
-              THEN 3
+        -- NULL DATES LAST
+        ELSE 3
+    END,
 
-            WHEN T.Status = 'Cancelled'
-              THEN 4
+    -- NEAREST DATE FIRST
+    T.DueDate ASC,
 
-            ELSE 5
-
-          END,
-
-          T.DueDate ASC,
-
-          T.CreatedDate DESC
+    -- NEWEST TASK FIRST FOR SAME DATE
+    T.CreatedDate DESC
 
       `);
 
