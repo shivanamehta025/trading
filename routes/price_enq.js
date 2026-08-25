@@ -470,4 +470,111 @@ router.post("/price-enquiry", async (req, res) => {
     }
 });
 
+// ============================================================
+// PRICE ENQUIRY - PENDING APPROVAL LIST
+// ============================================================
+
+router.post("/price-enquiry-pending", async (req, res) => {
+    try {
+
+        const {
+            databaseName
+        } = req.body;
+
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: "databaseName is required"
+            });
+        }
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input(
+                "WHAT",
+                sql.VarChar(50),
+                "GET_PENDING"
+            )
+            .execute("A_SP_PRICE_ENQUIRY");
+
+        return res.json({
+            success: true,
+            data: result.recordset || []
+        });
+
+    } catch (error) {
+
+        console.error(
+            "PRICE ENQUIRY PENDING ERROR:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// ============================================================
+// PRICE ENQUIRY - DETAIL
+// ============================================================
+
+router.post("/price-enquiry-detail", async (req, res) => {
+    try {
+
+        const {
+            databaseName,
+            enquiryUnq
+        } = req.body;
+
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: "databaseName is required"
+            });
+        }
+
+        if (!enquiryUnq) {
+            return res.status(400).json({
+                success: false,
+                message: "enquiryUnq is required"
+            });
+        }
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input(
+                "WHAT",
+                sql.VarChar(50),
+                "GET_DETAIL"
+            )
+            .input(
+                "ENQUIRYUNQ",
+                sql.UniqueIdentifier,
+                enquiryUnq
+            )
+            .execute("A_SP_PRICE_ENQUIRY");
+
+        return res.json({
+            success: true,
+            data: result.recordset || []
+        });
+
+    } catch (error) {
+
+        console.error(
+            "PRICE ENQUIRY DETAIL ERROR:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 module.exports = router;
