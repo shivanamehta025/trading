@@ -353,11 +353,7 @@ console.log('==========================================');
                     'SAVE_ENQUIRY'
                 )
 
-                .input(
-                    'TRANSPORTERUNQID',
-                    sql.NVarChar(100),
-                    null
-                )
+                
 
                 .input(
     'TRANSPORTERUNQID',
