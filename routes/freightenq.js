@@ -368,17 +368,17 @@ router.post('/save-freight-enquiry', async (req, res) => {
                     quantity
                 )
 
-                .input(
-                    'TRANSPORTER',
-                    sql.UniqueIdentifier,
-                    transporter
-                )
+               .input(
+    'TRANSPORTER',
+    sql.UniqueIdentifier,
+    transporter || null
+)
 
                 .input(
-                    'VEHICLE',
-                    sql.UniqueIdentifier,
-                    vehicle
-                )
+    'VEHICLE',
+    sql.UniqueIdentifier,
+    vehicle || null
+)
 
                 .input(
                     'VEHICLETYPE',
@@ -399,10 +399,12 @@ router.post('/save-freight-enquiry', async (req, res) => {
                 )
 
                 .input(
-                    'FREIGHT',
-                    sql.Decimal(18, 2),
-                    freight
-                )
+    'FREIGHT',
+    sql.Decimal(18, 2),
+    freight === '' || freight == null
+        ? null
+        : freight
+)
 
                 .input(
                     'CREATEDBY',
@@ -429,21 +431,40 @@ router.post('/save-freight-enquiry', async (req, res) => {
         });
 
 
-    } catch (error) {
+ } catch (error) {
 
-        console.error(
-            'SAVE FREIGHT ENQUIRY ERROR:',
-            error
-        );
+    console.error(
+        'SAVE FREIGHT ENQUIRY ERROR:',
+        error
+    );
 
-        res.status(500).json({
+    console.error(
+        'SQL ERROR MESSAGE:',
+        error.message
+    );
 
-            success: false,
+    console.error(
+        'SQL ERROR NUMBER:',
+        error.number
+    );
 
-            message: error.message
-        });
-    }
+    console.error(
+        'SQL ERROR STATE:',
+        error.state
+    );
 
+    console.error(
+        'SQL ERROR CLASS:',
+        error.class
+    );
+
+    res.status(500).json({
+        success: false,
+        message: error.message,
+        number: error.number,
+        state: error.state
+    });
+}
 });
 
 router.post('/freight-enquiry-next-no', async (req, res) => {
