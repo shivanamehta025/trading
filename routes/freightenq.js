@@ -322,7 +322,7 @@ router.post('/save-freight-enquiry', async (req, res) => {
 
                 .input(
     'TRANSPORTERUNQID',
-    sql.NVarChar(100),
+    sql.NVarChar(sql.MAX),
     transporterUnqids || null
 )
 
@@ -431,32 +431,17 @@ router.post('/save-freight-enquiry', async (req, res) => {
         });
 
 
- } catch (error) {
+} catch (error) {
 
     console.error(
-        'SAVE FREIGHT ENQUIRY ERROR:',
-        error
+        '========== SAVE FREIGHT ENQUIRY ERROR =========='
     );
 
-    console.error(
-        'SQL ERROR MESSAGE:',
-        error.message
-    );
-
-    console.error(
-        'SQL ERROR NUMBER:',
-        error.number
-    );
-
-    console.error(
-        'SQL ERROR STATE:',
-        error.state
-    );
-
-    console.error(
-        'SQL ERROR CLASS:',
-        error.class
-    );
+    console.error('MESSAGE:', error.message);
+    console.error('NUMBER:', error.number);
+    console.error('STATE:', error.state);
+    console.error('CLASS:', error.class);
+    console.error('STACK:', error.stack);
 
     res.status(500).json({
         success: false,
