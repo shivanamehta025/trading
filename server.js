@@ -1749,7 +1749,7 @@ app.post("/api/create-group", async (req, res) => {
   }
 });
 
-app.post("/api/my-groups", async (req, res) => {
+/* app.post("/api/my-groups", async (req, res) => {
   try {
     const { databaseName, userId } = req.body;
 
@@ -1819,7 +1819,7 @@ app.post("/api/my-groups", async (req, res) => {
       message: err.message,
     });
   }
-});
+}); */
 
 // ===============================
 // RENAME GROUP
@@ -2802,6 +2802,86 @@ app.post("/api/my-groups", async (req, res) => {
   try {
     const { databaseName, userId } = req.body;
 
+    if (!databaseName || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and userId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+      .input("USERID", sql.VarChar, userId)
+      .query(`
+  SELECT
+  G.GROUPID,
+  G.GROUPNAME,
+  G.CREATEDBY,
+  G.CREATEDON,
+
+  (
+    SELECT TOP 1 MESSAGE
+    FROM APP_CHAT AC
+    WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+      AND AC.DOCUMENTTYPE = 'GROUP'
+    ORDER BY AC.CREATEDON DESC
+  ) AS LASTMESSAGE,
+
+  (
+    SELECT TOP 1 CREATEDON
+    FROM APP_CHAT AC
+    WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+      AND AC.DOCUMENTTYPE = 'GROUP'
+    ORDER BY AC.CREATEDON DESC
+  ) AS LASTMESSAGEDATE,
+
+  (
+    SELECT TOP 1 FORMAT(AC.CREATEDON, 'hh:mm tt')
+    FROM APP_CHAT AC
+    WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+      AND AC.DOCUMENTTYPE = 'GROUP'
+    ORDER BY AC.CREATEDON DESC
+  ) AS TIME
+
+FROM CHATGROUPS G
+
+INNER JOIN CHATGROUPMEMBERS GM
+  ON G.GROUPID = GM.GROUPID
+
+WHERE UPPER(GM.USERID) = UPPER(@USERID)
+
+ORDER BY
+  (
+    SELECT TOP 1 AC.CREATEDON
+    FROM APP_CHAT AC
+    WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+      AND AC.DOCUMENTTYPE = 'GROUP'
+    ORDER BY AC.CREATEDON DESC
+  ) DESC,
+  G.CREATEDON DESC
+      `);
+
+    res.json({
+      success: true,
+      data: result.recordset,
+    });
+
+  } catch (err) {
+    console.log("Get My Groups Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+/* app.post("/api/my-groups", async (req, res) => {
+  try {
+    const { databaseName, userId } = req.body;
+
     // ==================================================
     // VALIDATION
     // ==================================================
@@ -2917,7 +2997,7 @@ app.post("/api/my-groups", async (req, res) => {
       message: err.message || "Failed to load groups",
     });
   }
-});
+}); */
 // ======================================================
 // RENAME GROUP
 // ======================================================
