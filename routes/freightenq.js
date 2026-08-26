@@ -304,6 +304,45 @@ router.post('/save-freight-enquiry', async (req, res) => {
         const pool =
             await getPool(databaseName);
 
+            console.log('');
+console.log('==========================================');
+console.log('FREIGHT ENQUIRY SQL REQUEST');
+console.log('==========================================');
+
+console.log('DATABASE       =', databaseName);
+console.log('USER           =', userId);
+
+console.log('PO             =', poUnqid);
+console.log('PONO           =', pono);
+
+console.log('FROM           =', fromCity);
+console.log('TO             =', toCity);
+
+console.log('PRODUCT        =', product);
+console.log('CUSTOMER       =', customer);
+console.log('QUANTITY       =', quantity);
+
+console.log('TRANSPORTER    =', transporter);
+console.log(
+    'TRANSPORTERS   =',
+    transporterUnqids
+);
+console.log(
+    'TRANSPORTER COUNT =',
+    transporterUnqids
+        ? transporterUnqids.split(',').length
+        : 0
+);
+
+console.log('VEHICLE        =', vehicle);
+console.log('VEHICLE TYPE    =', vehicleType);
+
+console.log('DRIVER NAME    =', driverName);
+console.log('DRIVER MOBILE  =', driverMobile);
+console.log('FREIGHT        =', freight);
+
+console.log('==========================================');
+
 
         const result =
             await pool.request()
@@ -433,21 +472,32 @@ router.post('/save-freight-enquiry', async (req, res) => {
 
 } catch (error) {
 
-    console.error(
-        '========== SAVE FREIGHT ENQUIRY ERROR =========='
-    );
+    console.error('');
+    console.error('==========================================');
+    console.error('SAVE FREIGHT ENQUIRY FAILED');
+    console.error('==========================================');
 
     console.error('MESSAGE:', error.message);
     console.error('NUMBER:', error.number);
     console.error('STATE:', error.state);
     console.error('CLASS:', error.class);
-    console.error('STACK:', error.stack);
+    console.error('CODE:', error.code);
+    console.error('PROCEDURE:', error.procName);
+    console.error('LINE:', error.lineNumber);
+
+    console.error('FULL ERROR:');
+    console.error(error);
+
+    console.error('==========================================');
 
     res.status(500).json({
         success: false,
         message: error.message,
         number: error.number,
-        state: error.state
+        state: error.state,
+        code: error.code,
+        procedure: error.procName,
+        line: error.lineNumber
     });
 }
 });
