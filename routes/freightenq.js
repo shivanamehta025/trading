@@ -261,6 +261,7 @@ router.post('/save-freight-enquiry', async (req, res) => {
             quantity,
 
             transporter,
+            transporterUnqids,
             vehicle,
             vehicleType,
 
@@ -289,6 +290,7 @@ router.post('/save-freight-enquiry', async (req, res) => {
         console.log('DRIVER:', driverName);
         console.log('DRIVER MOBILE:', driverMobile);
         console.log('FREIGHT:', freight);
+        console.log('TRANSPORTER UNQIDS:',transporterUnqids);
 
 
         if (!databaseName) {
@@ -317,6 +319,12 @@ router.post('/save-freight-enquiry', async (req, res) => {
                     sql.NVarChar(100),
                     null
                 )
+
+                .input(
+    'TRANSPORTERUNQID',
+    sql.NVarChar(100),
+    transporterUnqids || null
+)
 
                 .input(
                     'POUNQID',
