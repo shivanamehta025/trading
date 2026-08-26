@@ -576,5 +576,244 @@ router.post('/get-freight', async (req, res) => {
     }
 });
 
+router.post('/get-freight-approval-list', async (req, res) => {
+
+    try {
+
+        const {
+            databaseName,
+            userId
+        } = req.body;
+
+
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: 'databaseName is required'
+            });
+        }
+
+
+        const pool = await getPool(databaseName);
+
+
+        const result = await pool.request()
+
+            .input(
+                'WHAT',
+                sql.NVarChar(50),
+                'GET_FREIGHT_APPROVALS'
+            )
+
+            .input(
+                'POUNQID',
+                sql.NVarChar(100),
+                null
+            )
+
+            .execute(
+                'A_SP_FOR_FREIGHT_ENQUIRY'
+            );
+
+
+        res.json({
+            success: true,
+            data: result.recordset || []
+        });
+
+    } catch (error) {
+
+        console.error(
+            'GET FREIGHT APPROVAL LIST ERROR:',
+            error
+        );
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+router.post('/get-freight-approval-detail', async (req, res) => {
+
+    try {
+
+        const {
+            databaseName,
+            userId,
+            enquiryUnqid
+        } = req.body;
+
+
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: 'databaseName is required'
+            });
+        }
+
+
+        if (!enquiryUnqid) {
+            return res.status(400).json({
+                success: false,
+                message: 'enquiryUnqid is required'
+            });
+        }
+
+
+        const pool = await getPool(databaseName);
+
+
+        const result = await pool.request()
+
+            .input(
+                'WHAT',
+                sql.NVarChar(50),
+                'GET_FREIGHT_APPROVAL_DETAIL'
+            )
+
+            .input(
+                'POUNQID',
+                sql.UniqueIdentifier,
+                enquiryUnqid
+            )
+
+            .execute(
+                'A_SP_FOR_FREIGHT_ENQUIRY'
+            );
+
+
+        res.json({
+
+            success: true,
+
+            parent:
+                result.recordsets?.[0]?.[0] || null,
+
+            quotations:
+                result.recordsets?.[1] || []
+
+        });
+
+    } catch (error) {
+
+        console.error(
+            'GET FREIGHT APPROVAL DETAIL ERROR:',
+            error
+        );
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+router.post('/approve-freight', async (req, res) => {
+
+    try {
+
+        const {
+            databaseName,
+            userId,
+            childUnqid
+        } = req.body;
+
+
+        console.log(
+            '========== APPROVE FREIGHT =========='
+        );
+
+        console.log(
+            'DATABASE:',
+            databaseName
+        );
+
+        console.log(
+            'USER:',
+            userId
+        );
+
+        console.log(
+            'CHILD:',
+            childUnqid
+        );
+
+
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: 'databaseName is required'
+            });
+        }
+
+
+        if (!childUnqid) {
+            return res.status(400).json({
+                success: false,
+                message: 'childUnqid is required'
+            });
+        }
+
+
+        const pool = await getPool(databaseName);
+
+
+        const result = await pool.request()
+
+            .input(
+                'WHAT',
+                sql.NVarChar(50),
+                'APPROVE_FREIGHT'
+            )
+
+            // Here POUNQID carries the CHILD UNQID
+            .input(
+                'POUNQID',
+                sql.UniqueIdentifier,
+                childUnqid
+            )
+
+            .execute(
+                'A_SP_FOR_FREIGHT_ENQUIRY'
+            );
+
+
+        const record =
+            result.recordset?.[0] || null;
+
+
+        res.json({
+
+            success: true,
+
+            message:
+                record?.MESSAGE ||
+                'Freight approved successfully',
+
+            data: record
+
+        });
+
+    } catch (error) {
+
+        console.error(
+            'APPROVE FREIGHT ERROR:',
+            error
+        );
+
+        res.status(500).json({
+
+            success: false,
+
+            message: error.message
+
+        });
+
+    }
+
+});
+
 
 module.exports = router;
