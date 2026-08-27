@@ -2551,6 +2551,53 @@ app.post("/api/pin-chat-task", async (req, res) => {
 // GET PINNED TASKS FOR CHAT
 // ==========================================================
 
+// app.post("/api/get-chat-pins", async (req, res) => {
+//   try {
+//     const { databaseName, referenceId } = req.body;
+
+//     if (!databaseName || !referenceId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "databaseName and referenceId are required",
+//       });
+//     }
+
+//     const pool = await getPool(databaseName);
+
+//     const result = await pool
+//       .request()
+
+//       .input("REFERENCEID", sql.VarChar(255), referenceId).query(`
+//         SELECT
+//           PINID,
+//           REFERENCEID,
+//           TASKID,
+//           TASKTEXT,
+//           FROMUSER,
+//           TOUSER,
+//           CREATEDON,
+//           UPDATEDON
+
+//         FROM APP_CHAT_TASK_PIN
+
+//         WHERE REFERENCEID = @REFERENCEID
+
+//         ORDER BY CREATEDON DESC
+//       `);
+
+//     res.json({
+//       success: true,
+//       data: result.recordset,
+//     });
+//   } catch (err) {
+//     console.log("GET CHAT PINS ERROR =", err);
+
+//     res.status(500).json({
+//       success: false,
+//       message: err.message,
+//     });
+//   }
+// });
 app.post("/api/get-chat-pins", async (req, res) => {
   try {
     const { databaseName, referenceId } = req.body;
@@ -2568,21 +2615,37 @@ app.post("/api/get-chat-pins", async (req, res) => {
       .request()
 
       .input("REFERENCEID", sql.VarChar(255), referenceId).query(`
-        SELECT
-          PINID,
-          REFERENCEID,
-          TASKID,
-          TASKTEXT,
-          FROMUSER,
-          TOUSER,
-          CREATEDON,
-          UPDATEDON
+      SELECT
+        P.PINID,
+        P.REFERENCEID,
+        P.TASKID,
+        P.TASKTEXT,
+        P.FROMUSER,
+        P.TOUSER,
+        P.CREATEDON,
+        P.UPDATEDON,
 
-        FROM APP_CHAT_TASK_PIN
+        T.TaskTitle,
+        T.TaskDescription,
+        T.AssignedBy,
+        T.AssignedTo,
+        T.StartDate AS TASKASSIGNEDON,
+        T.DueDate,
+        T.Priority,
+        T.Status,
+        T.CreatedDate AS TASKCREATEDON
 
-        WHERE REFERENCEID = @REFERENCEID
+    FROM APP_CHAT_TASK_PIN P
 
-        ORDER BY CREATEDON DESC
+    LEFT JOIN MA_ChatTasks T
+        ON CONVERT(NVARCHAR(100), T.TaskId)
+         = CONVERT(NVARCHAR(100), P.TASKID)
+
+    WHERE P.REFERENCEID = @REFERENCEID
+
+    ORDER BY
+        T.StartDate DESC,
+        P.CREATEDON DESC
       `);
 
     res.json({
@@ -2593,6 +2656,176 @@ app.post("/api/get-chat-pins", async (req, res) => {
     console.log("GET CHAT PINS ERROR =", err);
 
     res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ==========================================================
+// GET ORIGINAL CHAT AROUND TASK ASSIGNMENT
+// ==========================================================
+
+// ==========================================================
+// GET ORIGINAL CHAT AROUND TASK ASSIGNMENT
+// ==========================================================
+
+app.post("/api/get-original-chat", async (req, res) => {
+  try {
+    const { databaseName, taskId } = req.body;
+
+    console.log("=================================");
+    console.log("GET ORIGINAL CHAT");
+    console.log("databaseName =", databaseName);
+    console.log("taskId       =", taskId);
+    console.log("=================================");
+
+    // ------------------------------------------------------
+    // VALIDATION
+    // ------------------------------------------------------
+
+    if (!databaseName || !taskId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and taskId are required",
+      });
+    }
+
+    // ------------------------------------------------------
+    // DATABASE
+    // ------------------------------------------------------
+
+    const pool = await getPool(databaseName);
+
+    // ------------------------------------------------------
+    // 1. GET TASK INFORMATION
+    // ------------------------------------------------------
+
+    const taskResult = await pool
+      .request()
+      .input("TASKID", sql.NVarChar(100), String(taskId)).query(`
+        SELECT TOP 1
+          TaskId,
+          TaskTitle,
+          TaskDescription,
+          AssignedBy,
+          AssignedTo,
+          StartDate,
+          DueDate,
+          Priority,
+          Status,
+          CreatedDate
+        FROM MA_ChatTasks
+        WHERE CONVERT(NVARCHAR(100), TaskId) = @TASKID
+      `);
+
+    if (taskResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    const task = taskResult.recordset[0];
+
+    // ------------------------------------------------------
+    // 2. GET CHAT USER ID OF ASSIGNEE
+    // ------------------------------------------------------
+
+    const assigneeResult = await pool
+      .request()
+      .input("ASSIGNEDTO", sql.NVarChar(100), String(task.AssignedTo)).query(`
+        SELECT TOP 1
+          UNQID,
+          SM63_5 AS ChatUserID,
+          SM63_6 AS UserName
+        FROM SM63
+        WHERE CONVERT(NVARCHAR(100), UNQID) = @ASSIGNEDTO
+      `);
+
+    if (assigneeResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Task assignee chat user not found",
+      });
+    }
+
+    const assignee = assigneeResult.recordset[0];
+
+    const fromUser = String(task.AssignedBy);
+    const toUser = String(assignee.ChatUserID);
+
+    // ------------------------------------------------------
+    // 3. GET ORIGINAL CHAT
+    //
+    // We use StartDate as the task assignment date.
+    //
+    // Example:
+    // StartDate = 2026-08-21
+    //
+    // We fetch:
+    // 1 day before
+    // assignment date
+    // 1 day after
+    // ------------------------------------------------------
+
+    const chatResult = await pool
+      .request()
+      .input("FROMUSER", sql.VarChar(100), fromUser)
+      .input("TOUSER", sql.VarChar(100), toUser)
+      .input("TASKDATE", sql.DateTime, task.StartDate).query(`
+        SELECT
+          FROMUSER,
+          TOUSER,
+          MESSAGE,
+          CREATEDON,
+          ISREAD
+        FROM APP_CHAT
+        WHERE
+          (
+            (
+              FROMUSER = @FROMUSER
+              AND TOUSER = @TOUSER
+            )
+            OR
+            (
+              FROMUSER = @TOUSER
+              AND TOUSER = @FROMUSER
+            )
+          )
+          AND CREATEDON >= DATEADD(DAY, -1, @TASKDATE)
+          AND CREATEDON < DATEADD(DAY, 2, @TASKDATE)
+
+        ORDER BY CREATEDON ASC
+      `);
+
+    // ------------------------------------------------------
+    // 4. RETURN EVERYTHING
+    // ------------------------------------------------------
+
+    return res.status(200).json({
+      success: true,
+
+      task: {
+        taskId: task.TaskId,
+        taskTitle: task.TaskTitle,
+        taskDescription: task.TaskDescription,
+        assignedBy: task.AssignedBy,
+        assignedTo: task.AssignedTo,
+        assignedChatUser: toUser,
+        assignedUserName: assignee.UserName,
+        taskAssignedOn: task.StartDate,
+        dueDate: task.DueDate,
+        priority: task.Priority,
+        status: task.Status,
+        createdDate: task.CreatedDate,
+      },
+
+      data: chatResult.recordset,
+    });
+  } catch (err) {
+    console.error("GET ORIGINAL CHAT ERROR =", err);
+
+    return res.status(500).json({
       success: false,
       message: err.message,
     });
