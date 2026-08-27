@@ -2598,6 +2598,221 @@ app.post("/api/get-chat-pins", async (req, res) => {
     });
   }
 });
+app.post("/api/send-task-reply", async (req, res) => {
+  try {
+    const { databaseName, referenceId, taskId, fromUser, toUser, message } =
+      req.body;
+
+    console.log("=================================");
+    console.log("SEND TASK REPLY");
+    console.log("databaseName =", databaseName);
+    console.log("referenceId  =", referenceId);
+    console.log("taskId       =", taskId);
+    console.log("fromUser     =", fromUser);
+    console.log("toUser       =", toUser);
+    console.log("message      =", message);
+    console.log("=================================");
+
+    // ------------------------------------------------------
+    // VALIDATION
+    // ------------------------------------------------------
+
+    if (
+      !databaseName ||
+      !referenceId ||
+      !taskId ||
+      !fromUser ||
+      !toUser ||
+      !message
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    // ------------------------------------------------------
+    // DATABASE
+    // ------------------------------------------------------
+
+    const pool = await getPool(databaseName);
+
+    // ------------------------------------------------------
+    // INSERT TASK REPLY
+    // ------------------------------------------------------
+
+    await pool
+      .request()
+
+      .input("REFERENCEID", sql.VarChar(255), String(referenceId))
+
+      .input("TASKID", sql.VarChar(100), String(taskId))
+
+      .input("FROMUSER", sql.VarChar(100), String(fromUser))
+
+      .input("TOUSER", sql.VarChar(100), String(toUser))
+
+      .input("MESSAGE", sql.NVarChar(sql.MAX), String(message)).query(`
+        INSERT INTO APP_CHAT_TASK_REPLY
+        (
+          REFERENCEID,
+          TASKID,
+          FROMUSER,
+          TOUSER,
+          MESSAGE,
+          CREATEDON,
+          ISREAD
+        )
+        VALUES
+        (
+          @REFERENCEID,
+          @TASKID,
+          @FROMUSER,
+          @TOUSER,
+          @MESSAGE,
+          GETDATE(),
+          0
+        )
+      `);
+
+    console.log("TASK REPLY SAVED");
+
+    return res.status(200).json({
+      success: true,
+      message: "Task reply sent successfully",
+    });
+  } catch (err) {
+    console.error("SEND TASK REPLY ERROR =", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ==========================================================
+// GET REPLIES FOR ONE TASK
+// ==========================================================
+
+app.post("/api/get-task-replies", async (req, res) => {
+  try {
+    const { databaseName, referenceId, taskId } = req.body;
+
+    console.log("=================================");
+    console.log("GET TASK REPLIES");
+    console.log("databaseName =", databaseName);
+    console.log("referenceId  =", referenceId);
+    console.log("taskId       =", taskId);
+    console.log("=================================");
+
+    if (!databaseName || !referenceId || !taskId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName, referenceId and taskId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+
+      .input("REFERENCEID", sql.VarChar(255), String(referenceId))
+
+      .input("TASKID", sql.VarChar(100), String(taskId)).query(`
+        SELECT
+          REPLYID,
+          REFERENCEID,
+          TASKID,
+          FROMUSER,
+          TOUSER,
+          MESSAGE,
+          CREATEDON,
+          ISREAD
+        FROM APP_CHAT_TASK_REPLY
+        WHERE REFERENCEID = @REFERENCEID
+          AND TASKID = @TASKID
+        ORDER BY CREATEDON ASC
+      `);
+
+    return res.status(200).json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error("GET TASK REPLIES ERROR =", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+// ==========================================================
+// GET ALL TASK REPLIES FOR CHAT
+// ==========================================================
+
+app.post("/api/get-chat-task-replies", async (req, res) => {
+  try {
+    const { databaseName, referenceId } = req.body;
+
+    console.log("=================================");
+    console.log("GET CHAT TASK REPLIES");
+    console.log("databaseName =", databaseName);
+    console.log("referenceId  =", referenceId);
+    console.log("=================================");
+
+    if (!databaseName || !referenceId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName and referenceId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+
+      .input("REFERENCEID", sql.VarChar(255), String(referenceId)).query(`
+        SELECT
+          R.REPLYID,
+          R.REFERENCEID,
+          R.TASKID,
+          R.FROMUSER,
+          R.TOUSER,
+          R.MESSAGE,
+          R.CREATEDON,
+          R.ISREAD,
+
+          P.TASKTEXT
+
+        FROM APP_CHAT_TASK_REPLY R
+
+        LEFT JOIN APP_CHAT_TASK_PIN P
+          ON P.REFERENCEID = R.REFERENCEID
+         AND P.TASKID = R.TASKID
+
+        WHERE R.REFERENCEID = @REFERENCEID
+
+        ORDER BY
+          R.TASKID,
+          R.CREATEDON ASC
+      `);
+
+    return res.status(200).json({
+      success: true,
+      data: result.recordset,
+    });
+  } catch (err) {
+    console.error("GET CHAT TASK REPLIES ERROR =", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 //group api's
 
 // ======================================================
