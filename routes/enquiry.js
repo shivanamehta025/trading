@@ -4,6 +4,8 @@ const router = express.Router();
 const sql = require("mssql");
 const { getPool } = require("../config/db");
 
+const sendNotification = require("../services/firebaseNotification");
+
 router.post('/enquiry-bind-dropdown', async (req, res) => {
 
     try {
@@ -171,6 +173,7 @@ router.post('/enquiry-save', async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 });
+
 router.post("/create-enquiry-notification", async (req, res) => {
   try {
     const { databaseName, referenceId, targetUser, title, message, documenttype, fromUser } = req.body;
@@ -429,6 +432,89 @@ router.post('/enquiry-check-pending-visit', async (req, res) => {
         console.error(err);
         res.status(500).json({ success: false, message: err.message });
     }
+});
+
+router.post('/enquiry-payment-followup', async (req, res) => {
+    try {
+        const {
+            databaseName,
+            customerName,
+            toDate
+        } = req.body;
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'payfollowup')
+            .input('CUSTNAME', sql.NVarChar(50), customerName)
+            .input('TODATE', sql.NVarChar(50), toDate)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            data: result.recordset || []
+        });
+
+    } catch (err) {
+        console.error(
+            'PAYMENT FOLLOW-UP ERROR:',
+            err
+        );
+
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
+
+router.post('/enquiry-payment-followup-save', async (req, res) => {
+  try {
+    const {
+      databaseName,
+      invnUnq,
+      remarks
+    } = req.body;
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Database name is required'
+      });
+    }
+
+    if (!invnUnq) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invoice UNQID is required'
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input('what', sql.NVarChar(50), 'PAYFOLLOWUP')
+      .input('INVNUNQ', sql.NVarChar(50), invnUnq)
+      .input(
+        'REMARKS',
+        sql.NVarChar(sql.MAX),
+        Array.isArray(remarks) ? remarks.join(', ') : (remarks || '')
+      )
+      .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+    res.json({
+      success: true,
+      message: 'Payment follow-up saved successfully'
+    });
+
+  } catch (err) {
+    console.error('Payment Follow-up Save Error:', err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
 });
 
 module.exports = router;
