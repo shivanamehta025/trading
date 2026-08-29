@@ -494,4 +494,100 @@ router.post("/collection-history", async (req, res) => {
     });
   }
 });
+
+// ============================================================
+// DASHBOARD CHALLAN REPORT
+// Loads only when user clicks Challans card
+// ============================================================
+
+router.post("/dashboard-challans", async (req, res) => {
+  try {
+
+    const {
+      databaseName,
+      userId
+    } = req.body;
+
+    console.log("======================================");
+    console.log("DASHBOARD CHALLAN REPORT REQUEST");
+    console.log("DATABASE =", databaseName);
+    console.log("USER ID  =", userId);
+    console.log("======================================");
+
+    // ---------------------------------------------------------
+    // VALIDATION
+    // ---------------------------------------------------------
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    // ---------------------------------------------------------
+    // GET DATABASE POOL
+    // ---------------------------------------------------------
+
+    const pool = await getPool(databaseName);
+
+    // ---------------------------------------------------------
+    // EXECUTE DASHBOARD SP
+    // ---------------------------------------------------------
+
+    const result = await pool
+      .request()
+
+      .input(
+        "WHAT",
+        sql.NVarChar(100),
+        "DASHBOARD_CHALLAN_REPORT"
+      )
+
+      .input(
+        "USERID",
+        sql.NVarChar(100),
+        userId
+      )
+
+      .execute("A_SP_FOR_DASHBOARD_APP");
+
+    // ---------------------------------------------------------
+    // LOG RESULT
+    // ---------------------------------------------------------
+
+    console.log(
+      "DASHBOARD CHALLAN COUNT =",
+      result.recordset.length
+    );
+
+    // ---------------------------------------------------------
+    // RESPONSE
+    // ---------------------------------------------------------
+
+    return res.status(200).json({
+      success: true,
+      data: result.recordset,
+    });
+
+  } catch (error) {
+
+    console.error(
+      "DASHBOARD CHALLAN REPORT ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 module.exports = router;
