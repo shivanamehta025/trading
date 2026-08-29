@@ -815,5 +815,67 @@ router.post('/approve-freight', async (req, res) => {
 
 });
 
+router.post('/get-freight-enquiry-list', async (req, res) => {
+
+    try {
+
+        const {
+            databaseName,
+            userId
+        } = req.body;
+
+        console.log(
+            '========== GET FREIGHT ENQUIRY LIST =========='
+        );
+
+        console.log('DATABASE:', databaseName);
+        console.log('USER:', userId);
+
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: 'databaseName is required'
+            });
+        }
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+
+            .input(
+                'WHAT',
+                sql.NVarChar(50),
+                'GET_FREIGHT_ENQUIRY_LIST'
+            )
+
+            .input(
+                'CREATEDBY',
+                sql.NVarChar(50),
+                userId
+            )
+
+            .execute(
+                'A_SP_FOR_FREIGHT_ENQUIRY'
+            );
+
+        res.json({
+            success: true,
+            data: result.recordset || []
+        });
+
+    } catch (error) {
+
+        console.error(
+            'GET FREIGHT ENQUIRY LIST ERROR:',
+            error
+        );
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 
 module.exports = router;
