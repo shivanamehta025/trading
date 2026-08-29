@@ -2551,53 +2551,6 @@ app.post("/api/pin-chat-task", async (req, res) => {
 // GET PINNED TASKS FOR CHAT
 // ==========================================================
 
-// app.post("/api/get-chat-pins", async (req, res) => {
-//   try {
-//     const { databaseName, referenceId } = req.body;
-
-//     if (!databaseName || !referenceId) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "databaseName and referenceId are required",
-//       });
-//     }
-
-//     const pool = await getPool(databaseName);
-
-//     const result = await pool
-//       .request()
-
-//       .input("REFERENCEID", sql.VarChar(255), referenceId).query(`
-//         SELECT
-//           PINID,
-//           REFERENCEID,
-//           TASKID,
-//           TASKTEXT,
-//           FROMUSER,
-//           TOUSER,
-//           CREATEDON,
-//           UPDATEDON
-
-//         FROM APP_CHAT_TASK_PIN
-
-//         WHERE REFERENCEID = @REFERENCEID
-
-//         ORDER BY CREATEDON DESC
-//       `);
-
-//     res.json({
-//       success: true,
-//       data: result.recordset,
-//     });
-//   } catch (err) {
-//     console.log("GET CHAT PINS ERROR =", err);
-
-//     res.status(500).json({
-//       success: false,
-//       message: err.message,
-//     });
-//   }
-// });
 app.post("/api/get-chat-pins", async (req, res) => {
   try {
     const { databaseName, referenceId } = req.body;
@@ -2615,37 +2568,21 @@ app.post("/api/get-chat-pins", async (req, res) => {
       .request()
 
       .input("REFERENCEID", sql.VarChar(255), referenceId).query(`
-      SELECT
-        P.PINID,
-        P.REFERENCEID,
-        P.TASKID,
-        P.TASKTEXT,
-        P.FROMUSER,
-        P.TOUSER,
-        P.CREATEDON,
-        P.UPDATEDON,
+        SELECT
+          PINID,
+          REFERENCEID,
+          TASKID,
+          TASKTEXT,
+          FROMUSER,
+          TOUSER,
+          CREATEDON,
+          UPDATEDON
 
-        T.TaskTitle,
-        T.TaskDescription,
-        T.AssignedBy,
-        T.AssignedTo,
-        T.StartDate AS TASKASSIGNEDON,
-        T.DueDate,
-        T.Priority,
-        T.Status,
-        T.CreatedDate AS TASKCREATEDON
+        FROM APP_CHAT_TASK_PIN
 
-    FROM APP_CHAT_TASK_PIN P
+        WHERE REFERENCEID = @REFERENCEID
 
-    LEFT JOIN MA_ChatTasks T
-        ON CONVERT(NVARCHAR(100), T.TaskId)
-         = CONVERT(NVARCHAR(100), P.TASKID)
-
-    WHERE P.REFERENCEID = @REFERENCEID
-
-    ORDER BY
-        T.StartDate DESC,
-        P.CREATEDON DESC
+        ORDER BY CREATEDON DESC
       `);
 
     res.json({
@@ -2661,6 +2598,70 @@ app.post("/api/get-chat-pins", async (req, res) => {
     });
   }
 });
+
+// app.post("/api/get-chat-pins", async (req, res) => {
+//   try {
+//     const { databaseName, referenceId } = req.body;
+
+//     if (!databaseName || !referenceId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "databaseName and referenceId are required",
+//       });
+//     }
+
+//     const pool = await getPool(databaseName);
+
+//     const result = await pool
+//       .request()
+
+//       .input("REFERENCEID", sql.VarChar(255), referenceId).query(`
+//       SELECT
+//         P.PINID,
+//         P.REFERENCEID,
+//         P.TASKID,
+//         P.TASKTEXT,
+//         P.FROMUSER,
+//         P.TOUSER,
+//         P.CREATEDON,
+//         P.UPDATEDON,
+
+//         T.TaskTitle,
+//         T.TaskDescription,
+//         T.AssignedBy,
+//         T.AssignedTo,
+//         T.StartDate AS TASKASSIGNEDON,
+//         T.DueDate,
+//         T.Priority,
+//         T.Status,
+//         T.CreatedDate AS TASKCREATEDON
+
+//     FROM APP_CHAT_TASK_PIN P
+
+//     LEFT JOIN MA_ChatTasks T
+//         ON CONVERT(NVARCHAR(100), T.TaskId)
+//          = CONVERT(NVARCHAR(100), P.TASKID)
+
+//     WHERE P.REFERENCEID = @REFERENCEID
+
+//     ORDER BY
+//         T.StartDate DESC,
+//         P.CREATEDON DESC
+//       `);
+
+//     res.json({
+//       success: true,
+//       data: result.recordset,
+//     });
+//   } catch (err) {
+//     console.log("GET CHAT PINS ERROR =", err);
+
+//     res.status(500).json({
+//       success: false,
+//       message: err.message,
+//     });
+//   }
+// });
 // ==========================================================
 // GET ORIGINAL CHAT AROUND TASK ASSIGNMENT
 // ==========================================================
