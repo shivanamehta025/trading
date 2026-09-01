@@ -493,7 +493,7 @@ router.post('/enquiry-payment-followup-save', async (req, res) => {
     const pool = await getPool(databaseName);
 
     const result = await pool.request()
-      .input('what', sql.NVarChar(50), 'PAYFOLLOWUP')
+      .input('what', sql.NVarChar(50), 'SavePAYFOLLOWUP')
       .input('INVNUNQ', sql.NVarChar(50), invnUnq)
       .input(
         'REMARKS',
@@ -517,4 +517,101 @@ router.post('/enquiry-payment-followup-save', async (req, res) => {
   }
 });
 
+router.post('/enquiry-invoice-deliver', async (req, res) => {
+    try {
+        const { databaseName } = req.body;
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'INVDELIVER')
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            data: result.recordset || []
+        });
+    } catch (err) {
+        console.error('INVOICE DELIVER LOAD ERROR:', err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
+
+router.post('/enquiry-invoice-deliver-save', async (req, res) => {
+    try {
+        const { databaseName, invnUnq } = req.body;
+
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Database name is required'
+            });
+        }
+
+        if (!invnUnq) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invoice UNQID is required'
+            });
+        }
+
+        const pool = await getPool(databaseName);
+
+        await pool.request()
+            .input('what', sql.NVarChar(50), 'SAVEINVDELIVER')
+            .input('INVNUNQ', sql.NVarChar(100), invnUnq)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            message: 'Invoice marked as delivered successfully'
+        });
+    } catch (err) {
+        console.error('INVOICE DELIVER SAVE ERROR:', err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
+
+router.post('/enquiry-customer-product-average', async (req, res) => {
+    try {
+        const { databaseName, customerId } = req.body;
+
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Database name is required'
+            });
+        }
+
+        if (!customerId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Customer id is required'
+            });
+        }
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'CUSTPRODUCTAVG')
+            .input('CUSTNAME', sql.NVarChar(50), customerId)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            data: result.recordset || []
+        });
+    } catch (err) {
+        console.error('CUSTOMER PRODUCT AVERAGE ERROR:', err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
 module.exports = router;
