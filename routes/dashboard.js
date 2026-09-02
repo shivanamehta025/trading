@@ -502,14 +502,13 @@ router.post("/collection-history", async (req, res) => {
 
 router.post("/dashboard-challans", async (req, res) => {
   try {
-
     const {
       databaseName,
       userId
     } = req.body;
 
     console.log("======================================");
-    console.log("DASHBOARD CHALLAN REPORT REQUEST");
+    console.log("DASHBOARD CHALLAN / ORDER BOOKING REQUEST");
     console.log("DATABASE =", databaseName);
     console.log("USER ID  =", userId);
     console.log("======================================");
@@ -560,12 +559,51 @@ router.post("/dashboard-challans", async (req, res) => {
       .execute("A_SP_FOR_DASHBOARD_APP");
 
     // ---------------------------------------------------------
+    // TWO RESULT SETS
+    // ---------------------------------------------------------
+
+    const challans =
+      result.recordsets?.[0] ?? [];
+
+    const orderBookings =
+      result.recordsets?.[1] ?? [];
+
+    // ---------------------------------------------------------
     // LOG RESULT
     // ---------------------------------------------------------
 
     console.log(
-      "DASHBOARD CHALLAN COUNT =",
-      result.recordset.length
+      "======================================"
+    );
+
+    console.log(
+      "CHALLAN COUNT =",
+      challans.length
+    );
+
+    console.log(
+      "ORDER BOOKING COUNT =",
+      orderBookings.length
+    );
+
+    console.log(
+      "TOTAL RESULT SETS =",
+      result.recordsets?.length ?? 0
+    );
+
+    console.log(
+      "======================================"
+    );
+
+    // Optional debugging
+    console.log(
+      "FIRST CHALLAN =",
+      challans[0]
+    );
+
+    console.log(
+      "FIRST ORDER BOOKING =",
+      orderBookings[0]
     );
 
     // ---------------------------------------------------------
@@ -574,14 +612,26 @@ router.post("/dashboard-challans", async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: result.recordset,
+
+      data: {
+        challans: challans,
+        orderBookings: orderBookings,
+      },
     });
 
   } catch (error) {
 
     console.error(
-      "DASHBOARD CHALLAN REPORT ERROR:",
+      "======================================"
+    );
+
+    console.error(
+      "DASHBOARD CHALLAN / ORDER BOOKING ERROR:",
       error
+    );
+
+    console.error(
+      "======================================"
     );
 
     return res.status(500).json({

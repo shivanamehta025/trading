@@ -3,6 +3,7 @@ const cors = require("cors");
 const https = require("https");
 const http_mod = require("http");
 const sql = require("mssql");
+const aiRoutes = require("./routes/ai");
 
 require("dotenv").config();
 
@@ -15,6 +16,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
+
+console.log("======================================");
+console.log("Q AI ROUTE LOADED");
+console.log("aiRoutes type:", typeof aiRoutes);
+console.log("======================================");
+
+app.use("/api/ai", aiRoutes);
+
 
 // ── HEALTH CHECK ─────────────────────────────────────
 app.get("/", (_, res) => {
