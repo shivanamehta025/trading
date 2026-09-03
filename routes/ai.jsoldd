@@ -206,12 +206,78 @@ if (intent === "CUSTOMER_FOLLOW_UP") {
         };
     }
 
-} else if (intent === "NEW_CUSTOMERS") {
+} else if (intent === "PRODUCT_PERFORMANCE") {
 
-    answer = buildNewCustomersAnswer(
-        question,
-        aiData
-    );
+    // Deterministic calculation: rank products locally.
+    // This avoids sending the complete product dataset to Groq.
+    const products = Array.isArray(aiData?.products)
+        ? aiData.products
+        : [];
+
+    if (!products.length) {
+        answer = "No product performance data is available.";
+        aiData.productPerformance = {
+            highestProduct: null,
+            ranking: []
+        };
+    } else {
+
+        const getPerformanceValue = (p) => {
+            const candidates = [
+                p.performancePercent,
+                p.performance,
+                p.growthPercent,
+                p.currentAmount,
+                p.currentQty
+            ];
+
+            for (const value of candidates) {
+                const n = Number(value);
+                if (Number.isFinite(n)) return n;
+            }
+
+            return 0;
+        };
+
+        const ranking = products
+            .map(p => ({
+                productName:
+                    p.productName ||
+                    p.product ||
+                    p.ProductName ||
+                    "Unknown Product",
+                performanceValue: getPerformanceValue(p),
+                performancePercent:
+                    p.performancePercent ??
+                    p.performance ??
+                    p.growthPercent ??
+                    null
+            }))
+            .sort((a, b) =>
+                Number(b.performanceValue) -
+                Number(a.performanceValue)
+            );
+
+        const top = ranking[0];
+
+        answer =
+            `**Product with the highest performance:**\n\n` +
+            `- **Product:** ${top.productName}\n` +
+            `- **Performance:** ${
+                top.performancePercent !== null
+                    ? Number(top.performancePercent).toLocaleString("en-IN", {
+                        maximumFractionDigits: 2
+                    }) + "%"
+                    : Number(top.performanceValue).toLocaleString("en-IN", {
+                        maximumFractionDigits: 2
+                    })
+            }`;
+
+        aiData.productPerformance = {
+            highestProduct: top,
+            ranking
+        };
+    }
 
 } else if (intent === "TOP_CUSTOMERS") {
 
@@ -679,31 +745,6 @@ function buildCustomerGrowthAnswer(question, data) {
         `- **${customer.customerName}** has the highest growth ` +
         `at ${customer.growthPercent}%.`
     );
-}
-
-function buildNewCustomersAnswer(question, data) {
-    const customers = Array.isArray(data?.newCustomers)
-        ? data.newCustomers
-        : [];
-
-    if (!customers.length) {
-        return "No new customers found for the current month.";
-    }
-
-    const top = customers.slice(0, 10);
-
-    return [
-        "**New customers this month:**",
-        "",
-        `**Total new customers:** ${customers.length}`,
-        "",
-        ...top.map((customer, index) =>
-            `${index + 1}. **${customer.customerName}** — ` +
-            `Current month: ${customer.currentMonthQty}`
-        ),
-        "",
-        "*New customer = current-month purchase with zero prior monthly average quantity in the available customer data.*"
-    ].join("\n");
 }
 
 function buildTopCustomersAnswer(question, data) {
@@ -1246,7 +1287,11 @@ const productPerformance =
     q.includes("how are products performing") ||
     q.includes("how is product performance") ||
     q.includes("product performance report") ||
-    q.includes("product performance summary");
+    q.includes("product performance summary") ||
+    q.includes("which product has the highest performance") ||
+    q.includes("which product has the best performance") ||
+    q.includes("best performing product") ||
+    q.includes("highest performing product");
 
 if (productPerformance) {
     return "PRODUCT_PERFORMANCE";
@@ -1326,27 +1371,7 @@ if (
     }
 
     // ==================================================
-    // 7. NEW CUSTOMERS
-    // Customers with current-month purchases and no prior
-    // monthly quantity in the TOP_CUSTOMERS result set.
-    // This uses the existing SQL result set, so no new SQL
-    // table/query is required.
-    // ==================================================
-
-    if (
-        q.includes("new customers") ||
-        q.includes("new customer") ||
-        q.includes("customers acquired") ||
-        q.includes("newly acquired customers") ||
-        q.includes("customers added this month") ||
-        q.includes("first time customers") ||
-        q.includes("first-time customers")
-    ) {
-        return "NEW_CUSTOMERS";
-    }
-
-    // ==================================================
-    // 8. TOP CUSTOMERS
+    // 7. TOP CUSTOMERS
     // ==================================================
 
     if (
@@ -1623,13 +1648,6 @@ switch (intent) {
     what = "PRODUCT_PERFORMANCE";
     break;
 
-    case "NEW_CUSTOMERS":
-        // Reuse the existing TOP_CUSTOMERS SQL result.
-        // New = current-month quantity > 0 and prior monthly
-        // average quantity is zero.
-        what = "TOP_CUSTOMERS";
-        break;
-
     case "TOP_CUSTOMERS":
         what = "TOP_CUSTOMERS";
         break;
@@ -1746,7 +1764,6 @@ if (
         intent === "PRODUCT_GROWTH" ||
         intent === "PRODUCT_DECLINE" ||
         intent === "CUSTOMER_DUE_BILLS" ||
-        intent === "NEW_CUSTOMERS" ||
     	intent === "LOST_CUSTOMERS"
     ) { 
         console.log("======================================");
@@ -1814,6 +1831,75 @@ function findCustomerOutstandingResultSet(recordsets) {
 
 function normalizeData(intent, rawData) {
 
+
+// ==================================================
+    // PRODUCT PERFORMANCE
+    // ==================================================
+
+    if (intent === "PRODUCT_PERFORMANCE") {
+
+        const sets = Array.isArray(rawData?.recordsets)
+            ? rawData.recordsets
+            : [];
+
+        const rows =
+            sets.find(set =>
+                Array.isArray(set) &&
+                set.some(row =>
+                    row &&
+                    (
+                        "ProductName" in row ||
+                        "productName" in row ||
+                        "Product" in row ||
+                        "GrowthPercent" in row ||
+                        "PerformancePercent" in row ||
+                        "Performance" in row ||
+                        "CurrentAmount" in row ||
+                        "CurrentQty" in row
+                    )
+                )
+            ) || [];
+
+        return {
+            products: rows.map(row => ({
+                productName:
+                    row.ProductName ??
+                    row.productName ??
+                    row.Product ??
+                    row.product ??
+                    null,
+
+                performancePercent:
+                    row.PerformancePercent ??
+                    row.performancePercent ??
+                    null,
+
+                performance:
+                    row.Performance ??
+                    row.performance ??
+                    null,
+
+                growthPercent:
+                    row.GrowthPercent ??
+                    row.growthPercent ??
+                    null,
+
+                currentAmount:
+                    Number(
+                        row.CurrentAmount ??
+                        row.currentAmount ??
+                        0
+                    ),
+
+                currentQty:
+                    Number(
+                        row.CurrentQty ??
+                        row.currentQty ??
+                        0
+                    )
+            }))
+        };
+    }
 
 // ==================================================
 // PRODUCT GROWTH
