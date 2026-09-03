@@ -112,6 +112,10 @@ console.log(JSON.stringify(aiData, null, 2));
 console.log("======================================");
         console.log("AI Data Prepared");
 
+        if (intent === "NEW_CUSTOMERS") {
+            console.log("NEW CUSTOMERS COUNT:", normalizedData?.newCustomers);
+        }
+
         if (intent === "CUSTOMER_DUE_BILLS") {
             console.log(
                 "Outstanding customers:",
@@ -137,7 +141,15 @@ console.log("======================================");
         let answer;
 
 
-if (intent === "CUSTOMER_FOLLOW_UP") {
+if (intent === "NEW_CUSTOMERS") {
+
+    const count = Number(aiData?.newCustomers ?? 0);
+
+    answer = count > 0
+        ? `**New customers:** ${count}`
+        : "There are no new customers in the current customer-health period.";
+
+} else if (intent === "CUSTOMER_FOLLOW_UP") {
 
     answer = buildCustomerFollowUpAnswer(aiData);
 
@@ -205,13 +217,6 @@ if (intent === "CUSTOMER_FOLLOW_UP") {
             ranking
         };
     }
-
-} else if (intent === "NEW_CUSTOMERS") {
-
-    answer = buildNewCustomersAnswer(
-        question,
-        aiData
-    );
 
 } else if (intent === "TOP_CUSTOMERS") {
 
@@ -679,31 +684,6 @@ function buildCustomerGrowthAnswer(question, data) {
         `- **${customer.customerName}** has the highest growth ` +
         `at ${customer.growthPercent}%.`
     );
-}
-
-function buildNewCustomersAnswer(question, data) {
-    const customers = Array.isArray(data?.newCustomers)
-        ? data.newCustomers
-        : [];
-
-    if (!customers.length) {
-        return "No new customers found for the current month.";
-    }
-
-    const top = customers.slice(0, 10);
-
-    return [
-        "**New customers this month:**",
-        "",
-        `**Total new customers:** ${customers.length}`,
-        "",
-        ...top.map((customer, index) =>
-            `${index + 1}. **${customer.customerName}** — ` +
-            `Current month: ${customer.currentMonthQty}`
-        ),
-        "",
-        "*New customer = current-month purchase with zero prior monthly average quantity in the available customer data.*"
-    ].join("\n");
 }
 
 function buildTopCustomersAnswer(question, data) {
@@ -1273,6 +1253,23 @@ if (
 ) {
     return "PRODUCT_DECLINE";
 }
+    // ==================================================
+    // NEW CUSTOMERS / CUSTOMER HEALTH
+    // ==================================================
+    // Uses the existing CUSTOMER_HEALTH SQL calculation.
+    if (
+        q === "new customer" ||
+        q === "new customers" ||
+        q.includes("new customer") ||
+        q.includes("newly acquired customer") ||
+        q.includes("newly acquired customers") ||
+        q.includes("customers acquired") ||
+        q.includes("customer acquisition")
+    ) {
+        return "NEW_CUSTOMERS";
+    }
+
+
   // ======================================================
 // 5. CUSTOMER GROWTH
 // ======================================================
@@ -1326,27 +1323,7 @@ if (
     }
 
     // ==================================================
-    // 7. NEW CUSTOMERS
-    // Customers with current-month purchases and no prior
-    // monthly quantity in the TOP_CUSTOMERS result set.
-    // This uses the existing SQL result set, so no new SQL
-    // table/query is required.
-    // ==================================================
-
-    if (
-        q.includes("new customers") ||
-        q.includes("new customer") ||
-        q.includes("customers acquired") ||
-        q.includes("newly acquired customers") ||
-        q.includes("customers added this month") ||
-        q.includes("first time customers") ||
-        q.includes("first-time customers")
-    ) {
-        return "NEW_CUSTOMERS";
-    }
-
-    // ==================================================
-    // 8. TOP CUSTOMERS
+    // 7. TOP CUSTOMERS
     // ==================================================
 
     if (
@@ -1597,6 +1574,12 @@ switch (intent) {
     case "LOST_CUSTOMERS":
         what = "LOST_CUSTOMERS";
         break;
+    case "NEW_CUSTOMERS":
+        // CUSTOMER_HEALTH returns NewCustomers count.
+        what = "CUSTOMER_HEALTH";
+        break;
+
+
 
     case "CUSTOMER_GROWTH":
         // Customer growth uses the customer-growth result set.
@@ -1622,13 +1605,6 @@ switch (intent) {
     case "PRODUCT_PERFORMANCE":
     what = "PRODUCT_PERFORMANCE";
     break;
-
-    case "NEW_CUSTOMERS":
-        // Reuse the existing TOP_CUSTOMERS SQL result.
-        // New = current-month quantity > 0 and prior monthly
-        // average quantity is zero.
-        what = "TOP_CUSTOMERS";
-        break;
 
     case "TOP_CUSTOMERS":
         what = "TOP_CUSTOMERS";
@@ -1746,7 +1722,6 @@ if (
         intent === "PRODUCT_GROWTH" ||
         intent === "PRODUCT_DECLINE" ||
         intent === "CUSTOMER_DUE_BILLS" ||
-        intent === "NEW_CUSTOMERS" ||
     	intent === "LOST_CUSTOMERS"
     ) { 
         console.log("======================================");
@@ -1956,6 +1931,26 @@ if (intent === "PRODUCT_DECLINE") {
         products: normalizedProducts.slice(0, 20)
     };
 }
+
+    // ==================================================
+    // NEW CUSTOMERS
+    // ==================================================
+    if (intent === "NEW_CUSTOMERS") {
+        const sets = rawData.recordsets || [];
+        const health = sets.find(set =>
+            Array.isArray(set) &&
+            set.some(row =>
+                row && Object.prototype.hasOwnProperty.call(row, "NewCustomers")
+            )
+        )?.[0] || {};
+
+        return {
+            newCustomers: Number(health.NewCustomers ?? 0),
+            repeatCustomers: Number(health.RepeatCustomers ?? 0),
+            reactivatedCustomers: Number(health.ReactivatedCustomers ?? 0),
+            lostCustomers: Number(health.LostCustomers ?? 0)
+        };
+    }
 
 if (intent === "CUSTOMER_GROWTH") {
 
@@ -2608,6 +2603,15 @@ function prepareAIData(intent, normalizedData = {}, question = "") {
         };
     }
 
+
+// ==================================================
+// NEW CUSTOMERS
+// ==================================================
+if (intent === "NEW_CUSTOMERS") {
+    return {
+        newCustomers: Number(normalizedData?.newCustomers ?? 0)
+    };
+}
 
 // ==================================================
 // FAST GROWING CUSTOMERS
