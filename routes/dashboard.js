@@ -640,4 +640,167 @@ router.post("/dashboard-challans", async (req, res) => {
     });
   }
 });
+
+// ============================================================
+// INVENTORY MANAGEMENT - USER WISE WAREHOUSES
+// ============================================================
+
+router.post("/inventory-warehouses", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      userId
+    } = req.body;
+
+    console.log("======================================");
+    console.log("INVENTORY WAREHOUSE REQUEST");
+    console.log("Database:", databaseName);
+    console.log("User ID:", userId);
+    console.log("======================================");
+
+    // Validation
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required"
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required"
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    // Call stored procedure
+    const result = await pool
+      .request()
+      .input(
+        "WHAT",
+        sql.NVarChar(50),
+        "IMS_MOBILE_WAREHOUSE"
+      )
+      .input(
+        "userid",
+        sql.NVarChar(50),
+        userId
+      )
+      .execute("A_SP_FOR_IMS_REPORT");
+
+    console.log(
+      "INVENTORY WAREHOUSES:",
+      result.recordset
+    );
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    console.error(
+      "INVENTORY WAREHOUSE ERROR:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
+
+// ============================================================
+// INVENTORY MANAGEMENT - SELECTED WAREHOUSE
+// ============================================================
+
+router.post("/inventory-management", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      userId,
+      warehouse
+    } = req.body;
+
+    console.log("======================================");
+    console.log("INVENTORY MANAGEMENT REQUEST");
+    console.log("Database:", databaseName);
+    console.log("User ID:", userId);
+    console.log("Warehouse:", warehouse);
+    console.log("======================================");
+
+    // Validation
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required"
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required"
+      });
+    }
+
+    if (!warehouse) {
+      return res.status(400).json({
+        success: false,
+        message: "warehouse is required"
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    // Call stored procedure
+    const result = await pool
+      .request()
+      .input(
+        "WHAT",
+        sql.NVarChar(50),
+        "IMS_MOBILE"
+      )
+      .input(
+        "WAREHOUSE",
+        sql.NVarChar(200),
+        warehouse
+      )
+      .input(
+        "userid",
+        sql.NVarChar(50),
+        userId
+      )
+      .execute("A_SP_FOR_IMS_REPORT");
+
+    console.log(
+      "INVENTORY DATA:",
+      result.recordset
+    );
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+
+  } catch (err) {
+
+    console.error(
+      "INVENTORY MANAGEMENT ERROR:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
+
 module.exports = router;
