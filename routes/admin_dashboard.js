@@ -378,4 +378,154 @@ router.post("/sales-analysis", async (req, res) => {
 
 });
 
+// ============================================================
+// DIRECTOR CUSTOMER LIST
+// ============================================================
+
+router.post("/director-customer-list", async (req, res) => {
+  try {
+
+    const {
+      databaseName,
+      userId,
+      period,
+      fromDate,
+      toDate,
+    } = req.body;
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+
+      .input(
+        "WHAT",
+        sql.NVarChar(50),
+        "DIRECTOR_CUSTOMER_LIST"
+      )
+
+      .input(
+        "USERID",
+        sql.NVarChar(100),
+        userId || ""
+      )
+
+      .input(
+        "PERIOD",
+        sql.NVarChar(20),
+        period || "MONTH"
+      )
+
+      .input(
+        "FROMDATE",
+        sql.Date,
+        fromDate || null
+      )
+
+      .input(
+        "TODATE",
+        sql.Date,
+        toDate || null
+      )
+
+      .execute("A_SP_FOR_SALES_ANALYSIS");
+
+    res.json(result.recordset);
+
+  } catch (err) {
+
+    console.error(
+      "DIRECTOR CUSTOMER LIST ERROR:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+// ============================================================
+// DIRECTOR CUSTOMER PRODUCTS
+// ============================================================
+
+router.post("/director-customer-products", async (req, res) => {
+  try {
+
+    const {
+      databaseName,
+      userId,
+      period,
+      customerId,
+      fromDate,
+      toDate,
+    } = req.body;
+
+    if (!customerId) {
+      return res.status(400).json({
+        success: false,
+        message: "customerId is required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+
+      .input(
+        "WHAT",
+        sql.NVarChar(50),
+        "DIRECTOR_CUSTOMER_PRODUCTS"
+      )
+
+      .input(
+        "USERID",
+        sql.NVarChar(100),
+        userId || ""
+      )
+
+      .input(
+        "PERIOD",
+        sql.NVarChar(20),
+        period || "MONTH"
+      )
+
+      .input(
+        "FROMDATE",
+        sql.Date,
+        fromDate || null
+      )
+
+      .input(
+        "TODATE",
+        sql.Date,
+        toDate || null
+      )
+
+      .input(
+        "CUSTOMERUNQID",
+        sql.UniqueIdentifier,
+        customerId
+      )
+
+      .execute("A_SP_FOR_SALES_ANALYSIS");
+
+    res.json(result.recordset);
+
+  } catch (err) {
+
+    console.error(
+      "DIRECTOR CUSTOMER PRODUCTS ERROR:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 module.exports = router;
