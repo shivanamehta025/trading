@@ -493,7 +493,7 @@ router.post('/enquiry-payment-followup-save', async (req, res) => {
     const pool = await getPool(databaseName);
 
     const result = await pool.request()
-      .input('what', sql.NVarChar(50), 'SavePAYFOLLOWUP')
+      .input('what', sql.NVarChar(50), 'SAVEPAYFOLLOWUP')
       .input('INVNUNQ', sql.NVarChar(50), invnUnq)
       .input(
         'REMARKS',
@@ -519,11 +519,12 @@ router.post('/enquiry-payment-followup-save', async (req, res) => {
 
 router.post('/enquiry-invoice-deliver', async (req, res) => {
     try {
-        const { databaseName } = req.body;
+        const { databaseName, customerName } = req.body;
         const pool = await getPool(databaseName);
 
         const result = await pool.request()
             .input('what', sql.NVarChar(50), 'INVDELIVER')
+            .input('CUSTNAME', sql.NVarChar(50), customerName)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
 
         res.json({
@@ -614,4 +615,5 @@ router.post('/enquiry-customer-product-average', async (req, res) => {
         });
     }
 });
+
 module.exports = router;
