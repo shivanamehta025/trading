@@ -596,4 +596,80 @@ router.post("/director-product-list", async (req, res) => {
   }
 });
 
+router.post("/director-product-branch-detail", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      userId,
+      period,
+      productId,
+      fromDate,
+      toDate,
+    } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        message: "productId is required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+
+      .input(
+        "WHAT",
+        sql.NVarChar(50),
+        "DIRECTOR_PRODUCT_BRANCH_DETAIL"
+      )
+
+      .input(
+        "USERID",
+        sql.NVarChar(100),
+        userId || ""
+      )
+
+      .input(
+        "PERIOD",
+        sql.NVarChar(20),
+        period || "MONTH"
+      )
+
+      .input(
+        "FROMDATE",
+        sql.Date,
+        fromDate || null
+      )
+
+      .input(
+        "TODATE",
+        sql.Date,
+        toDate || null
+      )
+
+      .input(
+        "PRODUCTUNQID",
+        sql.UniqueIdentifier,
+        productId
+      )
+
+      .execute("A_SP_FOR_SALES_ANALYSIS");
+
+    res.json(result.recordset);
+
+  } catch (err) {
+    console.error(
+      "DIRECTOR PRODUCT BRANCH DETAIL ERROR:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 module.exports = router;
