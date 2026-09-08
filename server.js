@@ -3336,9 +3336,15 @@ app.post("/api/create-group", async (req, res) => {
 //   }
 // });
 
+
 app.post("/api/my-groups", async (req, res) => {
   try {
     const { databaseName, userId } = req.body;
+
+    console.log("========== MY GROUPS REQUEST ==========");
+    console.log("databaseName =>", databaseName);
+    console.log("userId       =>", userId);
+    console.log("=======================================");
 
     if (!databaseName || !userId) {
       return res.status(400).json({
@@ -3348,7 +3354,7 @@ app.post("/api/my-groups", async (req, res) => {
     }
 
     const pool = await getPool(databaseName);
-console.log("userid is: ",userid);
+
     const result = await pool
       .request()
       .input("USERID", sql.VarChar, userId)
@@ -3383,21 +3389,18 @@ console.log("userid is: ",userid);
             ORDER BY AC.CREATEDON DESC
           ) AS TIME,
 
-          -- ============================================
-          -- GROUP UNREAD COUNT
-          -- ============================================
-         (
-  SELECT COUNT(*)
-  FROM APP_CHAT AC
-  WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
-    AND AC.DOCUMENTTYPE = 'GROUP'
-    AND UPPER(LTRIM(RTRIM(AC.FROMUSER))) <>
-        UPPER(LTRIM(RTRIM(@USERID)))
-    AND (
-      GM.LASTREADON IS NULL
-      OR AC.CREATEDON > GM.LASTREADON
-    )
-) AS UNREADCOUNT
+          (
+            SELECT COUNT(*)
+            FROM APP_CHAT AC
+            WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+              AND AC.DOCUMENTTYPE = 'GROUP'
+              AND UPPER(LTRIM(RTRIM(AC.FROMUSER))) <>
+                  UPPER(LTRIM(RTRIM(@USERID)))
+              AND (
+                GM.LASTREADON IS NULL
+                OR AC.CREATEDON > GM.LASTREADON
+              )
+          ) AS UNREADCOUNT
 
         FROM CHATGROUPS G
 
@@ -3418,11 +3421,13 @@ console.log("userid is: ",userid);
 
           G.CREATEDON DESC
       `);
-console.log("========== MY GROUPS API ==========");
-console.log("USERID =>", userId);
-console.log("RESULT =>", JSON.stringify(result.recordset, null, 2));
-console.log("===================================");
-    res.json({
+
+    console.log("========== MY GROUPS API ==========");
+    console.log("USERID =>", userId);
+    console.log("RESULT =>", JSON.stringify(result.recordset, null, 2));
+    console.log("===================================");
+
+    return res.json({
       success: true,
       data: result.recordset,
     });
@@ -3430,14 +3435,12 @@ console.log("===================================");
   } catch (err) {
     console.log("Get My Groups Error:", err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: err.message,
     });
   }
 });
-
-
 app.post("/api/rename-group", async (req, res) => {
   try {
     const { databaseName, groupId, groupName, userId } = req.body;
