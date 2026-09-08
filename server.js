@@ -3256,6 +3256,86 @@ app.post("/api/create-group", async (req, res) => {
 // GET MY GROUPS
 // ======================================================
 
+// app.post("/api/my-groups", async (req, res) => {
+//   try {
+//     const { databaseName, userId } = req.body;
+
+//     if (!databaseName || !userId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "databaseName and userId are required",
+//       });
+//     }
+
+//     const pool = await getPool(databaseName);
+
+//     const result = await pool
+//       .request()
+//       .input("USERID", sql.VarChar, userId)
+//       .query(`
+//   SELECT
+//   G.GROUPID,
+//   G.GROUPNAME,
+//   G.CREATEDBY,
+//   G.CREATEDON,
+
+//   (
+//     SELECT TOP 1 MESSAGE
+//     FROM APP_CHAT AC
+//     WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+//       AND AC.DOCUMENTTYPE = 'GROUP'
+//     ORDER BY AC.CREATEDON DESC
+//   ) AS LASTMESSAGE,
+
+//   (
+//     SELECT TOP 1 CREATEDON
+//     FROM APP_CHAT AC
+//     WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+//       AND AC.DOCUMENTTYPE = 'GROUP'
+//     ORDER BY AC.CREATEDON DESC
+//   ) AS LASTMESSAGEDATE,
+
+//   (
+//     SELECT TOP 1 FORMAT(AC.CREATEDON, 'hh:mm tt')
+//     FROM APP_CHAT AC
+//     WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+//       AND AC.DOCUMENTTYPE = 'GROUP'
+//     ORDER BY AC.CREATEDON DESC
+//   ) AS TIME
+
+// FROM CHATGROUPS G
+
+// INNER JOIN CHATGROUPMEMBERS GM
+//   ON G.GROUPID = GM.GROUPID
+
+// WHERE UPPER(GM.USERID) = UPPER(@USERID)
+
+// ORDER BY
+//   (
+//     SELECT TOP 1 AC.CREATEDON
+//     FROM APP_CHAT AC
+//     WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+//       AND AC.DOCUMENTTYPE = 'GROUP'
+//     ORDER BY AC.CREATEDON DESC
+//   ) DESC,
+//   G.CREATEDON DESC
+//       `);
+
+//     res.json({
+//       success: true,
+//       data: result.recordset,
+//     });
+
+//   } catch (err) {
+//     console.log("Get My Groups Error:", err);
+
+//     res.status(500).json({
+//       success: false,
+//       message: err.message,
+//     });
+//   }
+// });
+
 app.post("/api/my-groups", async (req, res) => {
   try {
     const { databaseName, userId } = req.body;
@@ -3268,59 +3348,80 @@ app.post("/api/my-groups", async (req, res) => {
     }
 
     const pool = await getPool(databaseName);
-
+console.log("userid is: ",userid);
     const result = await pool
       .request()
       .input("USERID", sql.VarChar, userId)
       .query(`
-  SELECT
-  G.GROUPID,
-  G.GROUPNAME,
-  G.CREATEDBY,
-  G.CREATEDON,
+        SELECT
+          G.GROUPID,
+          G.GROUPNAME,
+          G.CREATEDBY,
+          G.CREATEDON,
 
-  (
-    SELECT TOP 1 MESSAGE
-    FROM APP_CHAT AC
-    WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
-      AND AC.DOCUMENTTYPE = 'GROUP'
-    ORDER BY AC.CREATEDON DESC
-  ) AS LASTMESSAGE,
+          (
+            SELECT TOP 1 MESSAGE
+            FROM APP_CHAT AC
+            WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+              AND AC.DOCUMENTTYPE = 'GROUP'
+            ORDER BY AC.CREATEDON DESC
+          ) AS LASTMESSAGE,
 
-  (
-    SELECT TOP 1 CREATEDON
-    FROM APP_CHAT AC
-    WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
-      AND AC.DOCUMENTTYPE = 'GROUP'
-    ORDER BY AC.CREATEDON DESC
-  ) AS LASTMESSAGEDATE,
+          (
+            SELECT TOP 1 CREATEDON
+            FROM APP_CHAT AC
+            WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+              AND AC.DOCUMENTTYPE = 'GROUP'
+            ORDER BY AC.CREATEDON DESC
+          ) AS LASTMESSAGEDATE,
 
-  (
-    SELECT TOP 1 FORMAT(AC.CREATEDON, 'hh:mm tt')
-    FROM APP_CHAT AC
-    WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
-      AND AC.DOCUMENTTYPE = 'GROUP'
-    ORDER BY AC.CREATEDON DESC
-  ) AS TIME
+          (
+            SELECT TOP 1 FORMAT(AC.CREATEDON, 'hh:mm tt')
+            FROM APP_CHAT AC
+            WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+              AND AC.DOCUMENTTYPE = 'GROUP'
+            ORDER BY AC.CREATEDON DESC
+          ) AS TIME,
 
-FROM CHATGROUPS G
+          -- ============================================
+          -- GROUP UNREAD COUNT
+          -- ============================================
+         (
+  SELECT COUNT(*)
+  FROM APP_CHAT AC
+  WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+    AND AC.DOCUMENTTYPE = 'GROUP'
+    AND UPPER(LTRIM(RTRIM(AC.FROMUSER))) <>
+        UPPER(LTRIM(RTRIM(@USERID)))
+    AND (
+      GM.LASTREADON IS NULL
+      OR AC.CREATEDON > GM.LASTREADON
+    )
+) AS UNREADCOUNT
 
-INNER JOIN CHATGROUPMEMBERS GM
-  ON G.GROUPID = GM.GROUPID
+        FROM CHATGROUPS G
 
-WHERE UPPER(GM.USERID) = UPPER(@USERID)
+        INNER JOIN CHATGROUPMEMBERS GM
+          ON G.GROUPID = GM.GROUPID
 
-ORDER BY
-  (
-    SELECT TOP 1 AC.CREATEDON
-    FROM APP_CHAT AC
-    WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
-      AND AC.DOCUMENTTYPE = 'GROUP'
-    ORDER BY AC.CREATEDON DESC
-  ) DESC,
-  G.CREATEDON DESC
+        WHERE UPPER(LTRIM(RTRIM(GM.USERID))) =
+              UPPER(LTRIM(RTRIM(@USERID)))
+
+        ORDER BY
+          (
+            SELECT TOP 1 AC.CREATEDON
+            FROM APP_CHAT AC
+            WHERE AC.REFERENCEID = CAST(G.GROUPID AS VARCHAR)
+              AND AC.DOCUMENTTYPE = 'GROUP'
+            ORDER BY AC.CREATEDON DESC
+          ) DESC,
+
+          G.CREATEDON DESC
       `);
-
+console.log("========== MY GROUPS API ==========");
+console.log("USERID =>", userId);
+console.log("RESULT =>", JSON.stringify(result.recordset, null, 2));
+console.log("===================================");
     res.json({
       success: true,
       data: result.recordset,
@@ -3336,129 +3437,6 @@ ORDER BY
   }
 });
 
-/* app.post("/api/my-groups", async (req, res) => {
-  try {
-    const { databaseName, userId } = req.body;
-
-    // ==================================================
-    // VALIDATION
-    // ==================================================
-
-    if (!databaseName || !userId) {
-      return res.status(400).json({
-        success: false,
-        message: "databaseName and userId are required",
-      });
-    }
-
-    const cleanUserId = userId.toString().trim();
-
-    if (!cleanUserId) {
-      return res.status(400).json({
-        success: false,
-        message: "userId cannot be empty",
-      });
-    }
-
-    console.log("======================================");
-    console.log("GET MY GROUPS");
-    console.log("Database:", databaseName);
-    console.log("User ID:", cleanUserId);
-    console.log("======================================");
-
-    // ==================================================
-    // DATABASE CONNECTION
-    // ==================================================
-
-    const pool = await getPool(databaseName);
-
-    // ==================================================
-    // GET GROUPS
-    // ==================================================
-
-    const result = await pool
-      .request()
-      .input("USERID", sql.VarChar, cleanUserId).query(`
-        SELECT
-          G.GROUPID,
-          G.GROUPNAME,
-          G.CREATEDBY,
-
-          (
-            SELECT TOP 1
-              AC.MESSAGE
-            FROM APP_CHAT AC
-            WHERE AC.REFERENCEID =
-                  CAST(G.GROUPID AS VARCHAR)
-              AND AC.DOCUMENTTYPE = 'GROUP'
-            ORDER BY
-              AC.CREATEDON DESC
-          ) AS LASTMESSAGE,
-
-          (
-            SELECT TOP 1
-              AC.CREATEDON
-            FROM APP_CHAT AC
-            WHERE AC.REFERENCEID =
-                  CAST(G.GROUPID AS VARCHAR)
-              AND AC.DOCUMENTTYPE = 'GROUP'
-            ORDER BY
-              AC.CREATEDON DESC
-          ) AS LASTMESSAGEDATE
-
-        FROM CHATGROUPS G
-
-        INNER JOIN CHATGROUPMEMBERS GM
-          ON G.GROUPID = GM.GROUPID
-
-        WHERE UPPER(
-                LTRIM(RTRIM(GM.USERID))
-              )
-              =
-              UPPER(
-                LTRIM(RTRIM(@USERID))
-              )
-
-        ORDER BY
-          CASE
-            WHEN LASTMESSAGEDATE IS NULL
-            THEN 1
-            ELSE 0
-          END,
-
-          LASTMESSAGEDATE DESC,
-
-          G.GROUPID DESC
-      `);
-
-    console.log("GROUPS FOUND:", result.recordset.length);
-
-    // ==================================================
-    // RESPONSE
-    // ==================================================
-
-    return res.status(200).json({
-      success: true,
-      data: result.recordset,
-    });
-  } catch (err) {
-    console.log("======================================");
-
-    console.log("GET MY GROUPS ERROR:");
-
-    console.log(err);
-
-    console.log("======================================");
-
-    return res.status(500).json({
-      success: false,
-      message: err.message || "Failed to load groups",
-    });
-  }
-}); */
-// ======================================================
-// RENAME GROUP
-// ======================================================
 
 app.post("/api/rename-group", async (req, res) => {
   try {
