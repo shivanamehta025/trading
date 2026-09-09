@@ -616,4 +616,51 @@ router.post('/enquiry-customer-product-average', async (req, res) => {
     }
 });
 
+router.post('/enquiry-list', async (req, res) => {
+    try {
+        const { databaseName, userId } = req.body;
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'ENQUIRYLIST')
+            .input('e_3', sql.NVarChar(50), userId)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            data: result.recordset || []
+        });
+    } catch (err) {
+        console.error('ENQUIRY LIST ERROR:', err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
+
+router.post('/enquiry-detail', async (req, res) => {
+    try {
+        const { databaseName, unq } = req.body;
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'ENQUIRYDETAIL')
+            .input('unq', sql.NVarChar(50), unq)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            enquiry: result.recordsets[0][0] || null,
+            products: result.recordsets[1] || []
+        });
+    } catch (err) {
+        console.error('ENQUIRY DETAIL ERROR:', err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
+
 module.exports = router;
