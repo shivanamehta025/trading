@@ -3441,6 +3441,47 @@ app.post("/api/my-groups", async (req, res) => {
     });
   }
 });
+
+app.post("/api/group-mark-read", async (req, res) => {
+  try {
+    const { databaseName, groupId, userId } = req.body;
+
+    if (!databaseName || !groupId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName, groupId and userId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    await pool
+      .request()
+      .input("GROUPID", sql.Int, Number(groupId))
+      .input("USERID", sql.VarChar, userId)
+      .query(`
+        UPDATE CHATGROUPMEMBERS
+        SET LASTREADON = GETDATE()
+        WHERE GROUPID = @GROUPID
+          AND UPPER(LTRIM(RTRIM(USERID))) =
+              UPPER(LTRIM(RTRIM(@USERID)))
+      `);
+
+    return res.json({
+      success: true,
+      message: "Group marked as read",
+    });
+
+  } catch (err) {
+    console.log("Group Mark Read Error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 app.post("/api/rename-group", async (req, res) => {
   try {
     const { databaseName, groupId, groupName, userId } = req.body;
