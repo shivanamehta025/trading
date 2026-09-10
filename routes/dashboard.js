@@ -802,7 +802,7 @@ router.post("/inventory-management", async (req, res) => {
   }
 });
 
-app.post("/api/product-branch-analysis", async (req, res) => {
+router.post("/product-branch-analysis", async (req, res) => {
   try {
     const {
       databaseName,
