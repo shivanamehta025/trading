@@ -5,6 +5,40 @@ const http_mod = require("http");
 const sql = require("mssql");
 const aiRoutes = require("./routes/ai");
 
+
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
+// ======================================================
+// AUDIO UPLOAD
+// ======================================================
+
+const audioStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(
+      null,
+      path.join(uploadRoot, "audio")
+    );
+  },
+
+  filename: (req, file, cb) => {
+    const extension =
+      path.extname(file.originalname) || ".m4a";
+
+    const filename =
+      `group_audio_${Date.now()}${extension}`;
+
+    cb(null, filename);
+  },
+});
+
+const audioUpload = multer({
+  storage: audioStorage,
+  limits: {
+    fileSize: 25 * 1024 * 1024,
+  },
+});
+
 require("dotenv").config();
 
 const { getPool } = require("./config/db");
@@ -17,6 +51,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
+
 console.log("======================================");
 console.log("Q AI ROUTE LOADED");
 console.log("aiRoutes type:", typeof aiRoutes);
@@ -24,6 +59,24 @@ console.log("======================================");
 
 app.use("/api/ai", aiRoutes);
 
+const uploadRoot = path.join(__dirname, "uploads");
+
+const uploadFolders = [
+  "audio",
+  "video",
+  "images",
+  "documents",
+];
+
+uploadFolders.forEach((folder) => {
+  const folderPath = path.join(uploadRoot, folder);
+
+  if (!fs.existsSync(folderPath)) {
+    fs.mkdirSync(folderPath, {
+      recursive: true,
+    });
+  }
+});
 
 // ── HEALTH CHECK ─────────────────────────────────────
 app.get("/", (_, res) => {
@@ -7206,6 +7259,255 @@ app.post("/api/task-request-read", async (req, res) => {
     });
   }
 });
+
+app.post(
+  "/api/group-audio",
+  audioUpload.single("audio"),
+  async (req, res) => {
+    try {
+      const {
+        databaseName,
+        groupId,
+        fromUser,
+      } = req.body;
+
+      // ==================================================
+      // VALIDATION
+      // ==================================================
+
+      if (!databaseName || !groupId || !fromUser) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "databaseName, groupId and fromUser are required",
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Audio file is required",
+        });
+      }
+
+      const numericGroupId = Number(groupId);
+
+      const cleanFromUser =
+        fromUser.toString().trim();
+
+      if (
+        !Number.isInteger(numericGroupId) ||
+        numericGroupId <= 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid group ID",
+        });
+      }
+
+      if (!cleanFromUser) {
+        return res.status(400).json({
+          success: false,
+          message: "fromUser cannot be empty",
+        });
+      }
+
+      // ==================================================
+      // DATABASE CONNECTION
+      // ==================================================
+
+      const pool = await getPool(databaseName);
+
+      // ==================================================
+      // CHECK GROUP EXISTS
+      // ==================================================
+
+      const groupCheck = await pool
+        .request()
+        .input(
+          "GROUPID",
+          sql.Int,
+          numericGroupId
+        )
+        .query(`
+          SELECT GROUPID
+          FROM CHATGROUPS
+          WHERE GROUPID = @GROUPID
+        `);
+
+      if (
+        !groupCheck.recordset ||
+        groupCheck.recordset.length === 0
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "Group not found",
+        });
+      }
+
+      // ==================================================
+      // CHECK USER IS GROUP MEMBER
+      // ==================================================
+
+      const memberCheck = await pool
+        .request()
+        .input(
+          "GROUPID",
+          sql.Int,
+          numericGroupId
+        )
+        .input(
+          "USERID",
+          sql.VarChar,
+          cleanFromUser
+        )
+        .query(`
+          SELECT
+            GROUPID,
+            USERID
+          FROM CHATGROUPMEMBERS
+          WHERE GROUPID = @GROUPID
+            AND UPPER(LTRIM(RTRIM(USERID))) =
+                UPPER(LTRIM(RTRIM(@USERID)))
+        `);
+
+      if (
+        !memberCheck.recordset ||
+        memberCheck.recordset.length === 0
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You are not a member of this group",
+        });
+      }
+
+      // ==================================================
+      // FILE URL
+      // ==================================================
+
+      const fileUrl =
+        `/uploads/audio/${req.file.filename}`;
+
+      // ==================================================
+      // AUDIO MESSAGE METADATA
+      // ==================================================
+
+      const audioMessage = JSON.stringify({
+        type: "AUDIO",
+        fileName: req.file.filename,
+        originalName: req.file.originalname,
+        fileUrl: fileUrl,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+      });
+
+      // ==================================================
+      // INSERT INTO APP_CHAT
+      // ==================================================
+
+      const result = await pool
+        .request()
+        .input(
+          "REFERENCEID",
+          sql.VarChar,
+          numericGroupId.toString()
+        )
+        .input(
+          "FROMUSER",
+          sql.VarChar,
+          cleanFromUser
+        )
+        .input(
+          "MESSAGE",
+          sql.NVarChar,
+          audioMessage
+        )
+        .input(
+          "DOCUMENTTYPE",
+          sql.VarChar,
+          "GROUP"
+        )
+        .query(`
+          INSERT INTO APP_CHAT
+          (
+            REFERENCEID,
+            FROMUSER,
+            MESSAGE,
+            DOCUMENTTYPE,
+            CREATEDON
+          )
+          VALUES
+          (
+            @REFERENCEID,
+            @FROMUSER,
+            @MESSAGE,
+            @DOCUMENTTYPE,
+            GETDATE()
+          );
+
+          SELECT
+            SCOPE_IDENTITY() AS CHATID;
+        `);
+
+      const chatId =
+        result.recordset?.[0]?.CHATID ?? null;
+
+      // ==================================================
+      // LOG
+      // ==================================================
+
+      console.log(
+        "======================================"
+      );
+
+      console.log("GROUP AUDIO SENT:", {
+        groupId: numericGroupId,
+        fromUser: cleanFromUser,
+        chatId: chatId,
+        file: req.file.filename,
+        size: req.file.size,
+      });
+
+      console.log(
+        "======================================"
+      );
+
+      // ==================================================
+      // SUCCESS
+      // ==================================================
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Group audio uploaded successfully",
+        chatId: chatId,
+        fileUrl: fileUrl,
+      });
+
+    } catch (err) {
+      console.log(
+        "======================================"
+      );
+
+      console.log("GROUP AUDIO ERROR:");
+      console.log(err);
+
+      console.log(
+        "======================================"
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          err.message ||
+          "Failed to upload group audio",
+      });
+    }
+  }
+);
+
+
 // ============================================================
 // MARK TASK REQUESTS AS READ
 // ============================================================
