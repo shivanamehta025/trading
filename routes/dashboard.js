@@ -802,5 +802,119 @@ router.post("/inventory-management", async (req, res) => {
   }
 });
 
+app.post("/api/product-branch-analysis", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      userId,
+      productId,
+    } = req.body;
+
+    // ==========================================
+    // VALIDATION
+    // ==========================================
+
+    if (!databaseName || !userId || !productId) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName, userId and productId are required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    // ==========================================
+    // GET USER LEVEL
+    // SM63_5 = USER ID
+    // SM63_8 = LINK TO SM61.UNQID
+    // SM61_9 = USER LEVEL
+    // ==========================================
+
+    const userResult = await pool
+      .request()
+      .input(
+        "USERID",
+        sql.VarChar(100),
+        String(userId)
+      )
+      .query(`
+        SELECT TOP 1
+            SM63.SM63_5 AS USER_ID,
+            TRY_CONVERT(INT, SM61.SM61_9) AS USER_LEVEL
+        FROM SM63
+        INNER JOIN SM61
+            ON SM63.SM63_8 = SM61.UNQID
+        WHERE SM63.SM63_5 = @USERID
+      `);
+
+    // ==========================================
+    // USER NOT FOUND
+    // ==========================================
+
+    if (!userResult.recordset || userResult.recordset.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: "User not found or unauthorized",
+      });
+    }
+
+    const userLevel = userResult.recordset[0].USER_LEVEL;
+
+    // ==========================================
+    // ONLY LEVEL 1 & 2 ARE ALLOWED
+    // ==========================================
+
+    if (userLevel !== 1 && userLevel !== 2) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to access Product Branch Analysis",
+      });
+    }
+
+    // ==========================================
+    // CALL IMS REPORT STORED PROCEDURE
+    // ==========================================
+
+    const result = await pool
+      .request()
+      .input(
+        "WHAT",
+        sql.VarChar(50),
+        "PRODUCT_BRANCH_ANALYSIS"
+      )
+      .input(
+        "PRODUCT_ID",
+        sql.VarChar(100),
+        String(productId)
+      )
+      .input(
+        "USERID",
+        sql.VarChar(100),
+        String(userId)
+      )
+      .execute("A_SP_FOR_IMS_REPORT");
+
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
+    return res.status(200).json({
+      success: true,
+      data: result.recordset || [],
+    });
+
+  } catch (err) {
+    console.error(
+      "PRODUCT BRANCH ANALYSIS ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 
 module.exports = router;
