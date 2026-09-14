@@ -39,6 +39,32 @@ const audioUpload = multer({
   },
 });
 
+const chatAudioStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(
+      null,
+      path.join(uploadRoot, "audio")
+    );
+  },
+
+  filename: (req, file, cb) => {
+    const extension =
+      path.extname(file.originalname) || ".m4a";
+
+    const filename =
+      `chat_audio_${Date.now()}${extension}`;
+
+    cb(null, filename);
+  },
+});
+
+const chatAudioUpload = multer({
+  storage: chatAudioStorage,
+  limits: {
+    fileSize: 25 * 1024 * 1024,
+  },
+});
+
 require("dotenv").config();
 
 const { getPool } = require("./config/db");
