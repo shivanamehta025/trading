@@ -7507,6 +7507,150 @@ app.post(
   }
 );
 
+// ======================================================
+// SEND CHAT AUDIO
+// ======================================================
+
+
+app.post(
+  "/api/chat-audio",
+  chatAudioUpload.single("audio"),
+  async (req, res) => {
+    try {
+      const {
+        databaseName,
+        referenceId,
+        fromUser,
+        toUser,
+      } = req.body;
+
+      if (
+        !databaseName ||
+        !referenceId ||
+        !fromUser ||
+        !toUser
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "databaseName, referenceId, fromUser and toUser are required",
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Audio file is required",
+        });
+      }
+
+      const pool = await getPool(databaseName);
+
+      const fileUrl =
+        `/uploads/audio/${req.file.filename}`;
+
+      const audioMessage = JSON.stringify({
+        type: "AUDIO",
+        fileName: req.file.filename,
+        originalName: req.file.originalname,
+        fileUrl: fileUrl,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+      });
+
+      const result = await pool
+        .request()
+        .input(
+          "REFERENCEID",
+          sql.VarChar,
+          referenceId
+        )
+        .input(
+          "FROMUSER",
+          sql.VarChar,
+          fromUser
+        )
+        .input(
+          "TOUSER",
+          sql.VarChar,
+          toUser
+        )
+        .input(
+          "MESSAGE",
+          sql.NVarChar,
+          audioMessage
+        )
+        .query(`
+          INSERT INTO APP_CHAT
+          (
+            REFERENCEID,
+            FROMUSER,
+            TOUSER,
+            MESSAGE
+          )
+          VALUES
+          (
+            @REFERENCEID,
+            @FROMUSER,
+            @TOUSER,
+            @MESSAGE
+          );
+
+          SELECT
+            SCOPE_IDENTITY() AS CHATID;
+        `);
+
+      const chatId =
+        result.recordset?.[0]?.CHATID ?? null;
+
+      console.log(
+        "======================================"
+      );
+
+      console.log("CHAT AUDIO SENT:", {
+        referenceId: referenceId,
+        fromUser: fromUser,
+        toUser: toUser,
+        chatId: chatId,
+        file: req.file.filename,
+        size: req.file.size,
+      });
+
+      console.log(
+        "======================================"
+      );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Chat audio uploaded successfully",
+        chatId: chatId,
+        fileUrl: fileUrl,
+      });
+
+    } catch (err) {
+      console.log(
+        "======================================"
+      );
+
+      console.log("CHAT AUDIO ERROR:");
+      console.log(err);
+
+      console.log(
+        "======================================"
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          err.message ||
+          "Failed to upload chat audio",
+      });
+    }
+  }
+);
+
+
 
 // ============================================================
 // MARK TASK REQUESTS AS READ
