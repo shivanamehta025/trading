@@ -238,14 +238,14 @@ router.post('/enquiry-bind-data', async (req, res) => {
 
 router.post('/bind-rate', async (req, res) => {
     try {
-        const { databaseName, enquiryUnq, prounq, qty, formDate } = req.body;
+        const { databaseName, enquiryUnq, prounq, userid, formDate } = req.body;
         const pool = await getPool(databaseName);
 
         const result = await pool.request()
             .input('what', sql.NVarChar(50), 'bindrate')
             .input('e_c6', sql.NVarChar(50), enquiryUnq)
             .input('e_c8', sql.NVarChar(50), prounq)
-            .input('e_c11', sql.Decimal(18, 2), qty)
+            .input('e_3', sql.Decimal(18, 2), userid)
             .input('Fdate', sql.NVarChar(50), formDate)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
 
