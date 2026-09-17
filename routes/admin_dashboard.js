@@ -144,7 +144,15 @@ router.post("/sales-analysis", async (req, res) => {
       userId,
       period,
       fromDate,
-      toDate
+      toDate,
+       topProductsOffset = 0,
+       topProductsLimit = 5,
+
+  topCustomersOffset = 0,
+  topCustomersLimit = 5,
+
+  salespersonOffset = 0,
+  salespersonLimit = 5
     } = req.body;
 
 
@@ -183,61 +191,75 @@ router.post("/sales-analysis", async (req, res) => {
     // COMMON STORED PROCEDURE EXECUTOR
     // ============================================================
 
-    const executeSalesAnalysis = async (what) => {
+   const executeSalesAnalysis = async (
+  what,
+  offset = 0,
+  limit = 5
+) => {
 
-      console.log(
-        `Executing A_SP_FOR_SALES_ANALYSIS -> ${what}`
-      );
+  console.log(
+    `Executing A_SP_FOR_SALES_ANALYSIS -> ${what}`
+  );
 
+  console.log(
+    `OFFSET = ${offset}, LIMIT = ${limit}`
+  );
 
-      const request = pool.request()
+  const request = pool.request()
 
-        .input(
-          "WHAT",
-          sql.NVarChar(50),
-          what
-        )
+    .input(
+      "WHAT",
+      sql.NVarChar(50),
+      what
+    )
 
-        .input(
-          "USERID",
-          sql.NVarChar(100),
-          userId || ""
-        )
+    .input(
+      "USERID",
+      sql.NVarChar(100),
+      userId || ""
+    )
 
-        .input(
-          "PERIOD",
-          sql.NVarChar(20),
-          period || "MONTH"
-        )
+    .input(
+      "PERIOD",
+      sql.NVarChar(20),
+      period || "MONTH"
+    )
 
-        .input(
-          "FROMDATE",
-          sql.Date,
-          fromDate || null
-        )
+    .input(
+      "FROMDATE",
+      sql.Date,
+      fromDate || null
+    )
 
-        .input(
-          "TODATE",
-          sql.Date,
-          toDate || null
-        );
+    .input(
+      "TODATE",
+      sql.Date,
+      toDate || null
+    )
 
+    .input(
+      "OFFSET",
+      sql.Int,
+      Number(offset) || 0
+    )
 
-      const result =
-        await request.execute(
-          "A_SP_FOR_SALES_ANALYSIS"
-        );
+    .input(
+      "LIMIT",
+      sql.Int,
+      Number(limit) || 5
+    );
 
+  const result =
+    await request.execute(
+      "A_SP_FOR_SALES_ANALYSIS"
+    );
 
-      console.log(
-        `${what} -> ${result.recordset?.length || 0} rows`
-      );
+  console.log(
+    `${what} -> ${result.recordset?.length || 0} rows`
+  );
 
-
-      return result.recordset || [];
-
-    };
-
+  return result.recordset || [];
+};
 
     // ============================================================
     // 1. SUMMARY
@@ -273,30 +295,34 @@ router.post("/sales-analysis", async (req, res) => {
     // 4. TOP PRODUCTS
     // ============================================================
 
-    const topProducts =
-      await executeSalesAnalysis(
-        "TOP_PRODUCTS"
-      );
-
+  const topProducts =
+  await executeSalesAnalysis(
+    "TOP_PRODUCTS",
+    topProductsOffset,
+    topProductsLimit
+  );
 
     // ============================================================
     // 5. TOP CUSTOMERS
     // ============================================================
 
-    const topCustomers =
-      await executeSalesAnalysis(
-        "TOP_CUSTOMERS"
-      );
-
+const topCustomers =
+  await executeSalesAnalysis(
+    "TOP_CUSTOMERS",
+    topCustomersOffset,
+    topCustomersLimit
+  );
 
     // ============================================================
     // 6. SALESPERSON SALES
     // ============================================================
 
-    const salespersonSales =
-      await executeSalesAnalysis(
-        "SALESPERSON_SALES"
-      );
+   const salespersonSales =
+  await executeSalesAnalysis(
+    "SALESPERSON_SALES",
+    salespersonOffset,
+    salespersonLimit
+  );
 
 
     // ============================================================
@@ -371,6 +397,217 @@ router.post("/sales-analysis", async (req, res) => {
       message:
         err.message ||
         "Failed to load sales analysis"
+
+    });
+
+  }
+
+});
+
+// ============================================================
+// PAGED SALES ANALYSIS
+// Used by Show More buttons
+// ============================================================
+
+router.post("/sales-analysis/paged", async (req, res) => {
+  try {
+
+    const {
+      databaseName,
+      userId,
+      period,
+      fromDate,
+      toDate,
+      what,
+      offset = 0,
+      limit = 5
+    } = req.body;
+
+
+    console.log("=================================");
+    console.log("PAGED SALES ANALYSIS");
+    console.log("DATABASE =", databaseName);
+    console.log("USER ID  =", userId);
+    console.log("PERIOD   =", period);
+    console.log("WHAT     =", what);
+    console.log("OFFSET   =", offset);
+    console.log("LIMIT    =", limit);
+    console.log("FROM     =", fromDate);
+    console.log("TO       =", toDate);
+    console.log("=================================");
+
+
+    // ============================================================
+    // VALIDATION
+    // ============================================================
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required"
+      });
+    }
+
+
+    if (!what) {
+      return res.status(400).json({
+        success: false,
+        message: "what is required"
+      });
+    }
+
+
+    // Only allow these three paginated sections
+    const allowedWhat = [
+      "TOP_PRODUCTS",
+      "TOP_CUSTOMERS",
+      "SALESPERSON_SALES"
+    ];
+
+
+    if (!allowedWhat.includes(what)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid sales analysis section"
+      });
+    }
+
+
+    // ============================================================
+    // GET DATABASE POOL
+    // ============================================================
+
+    const pool = await getPool(databaseName);
+
+
+    // ============================================================
+    // SAFE PAGINATION VALUES
+    // ============================================================
+
+    const safeOffset =
+      Math.max(0, Number(offset) || 0);
+
+    const safeLimit =
+      Math.max(1, Number(limit) || 5);
+
+
+    console.log(
+      `Executing A_SP_FOR_SALES_ANALYSIS -> ${what}`
+    );
+
+    console.log(
+      `OFFSET = ${safeOffset}, LIMIT = ${safeLimit}`
+    );
+
+
+    // ============================================================
+    // EXECUTE ONLY REQUESTED SECTION
+    // ============================================================
+
+    const request = pool.request()
+
+      .input(
+        "WHAT",
+        sql.NVarChar(50),
+        what
+      )
+
+      .input(
+        "USERID",
+        sql.NVarChar(100),
+        userId || ""
+      )
+
+      .input(
+        "PERIOD",
+        sql.NVarChar(20),
+        period || "MONTH"
+      )
+
+      .input(
+        "FROMDATE",
+        sql.Date,
+        fromDate || null
+      )
+
+      .input(
+        "TODATE",
+        sql.Date,
+        toDate || null
+      )
+
+      .input(
+        "OFFSET",
+        sql.Int,
+        safeOffset
+      )
+
+      .input(
+        "LIMIT",
+        sql.Int,
+        safeLimit
+      );
+
+
+    const result =
+      await request.execute(
+        "A_SP_FOR_SALES_ANALYSIS"
+      );
+
+
+    const rows =
+      result.recordset || [];
+
+
+    console.log(
+      `${what} -> ${rows.length} rows`
+    );
+
+
+    // ============================================================
+    // RESPONSE
+    // ============================================================
+
+    return res.json({
+
+      success: true,
+
+      what: what,
+
+      offset: safeOffset,
+
+      limit: safeLimit,
+
+      data: rows
+
+    });
+
+  }
+
+  catch (err) {
+
+    console.error(
+      "================================="
+    );
+
+    console.error(
+      "PAGED SALES ANALYSIS ERROR"
+    );
+
+    console.error(err);
+
+    console.error(
+      "================================="
+    );
+
+
+    return res.status(500).json({
+
+      success: false,
+
+      message:
+        err.message ||
+        "Failed to load paged sales analysis"
 
     });
 
