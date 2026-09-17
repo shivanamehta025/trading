@@ -663,4 +663,71 @@ router.post('/enquiry-detail', async (req, res) => {
     }
 });
 
+router.post('/notification-action-status', async (req, res) => {
+    try {
+        const { items } = req.body;
+ 
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.json({ success: true, data: {} });
+        }
+ 
+        const grouped = {};
+        for (const it of items) {
+            const refId = it?.referenceId;
+            const dbName = it?.databaseName;
+            if (!refId || !dbName) continue;
+ 
+            if (!grouped[dbName]) grouped[dbName] = new Set();
+            grouped[dbName].add(refId);
+        }
+ 
+        const data = {};
+ 
+        for (const dbName of Object.keys(grouped)) {
+            const refIds = Array.from(grouped[dbName]);
+            const pool = await getPool(dbName);
+            const request = pool.request();
+ 
+            const placeholders = refIds
+                .map((id, idx) => {
+                    const paramName = `ref${idx}`;
+                    request.input(paramName, sql.NVarChar(50), id);
+                    return `@${paramName}`;
+                })
+                .join(',');
+ 
+            const result = await request.query(`
+                SELECT
+                    C.e_c_6 AS REFID,
+                    MAX(
+                        CASE
+                            WHEN LOWER(ISNULL(S.sm206_29, '')) <> 'truck'
+                                 AND C.e_c_14 IS NULL
+                            THEN 1 ELSE 0
+                        END
+                    ) AS HAS_PENDING_ENQUIRY_RATE,
+                    MAX(
+                        CASE WHEN C.e_c_19 IS NOT NULL THEN 1 ELSE 0 END
+                    ) AS HAS_ADMIN_RATE
+ 
+                FROM enq_4_c C
+                INNER JOIN sm206 S ON S.sm206_2 = C.e_c_8
+                WHERE C.e_c_6 IN (${placeholders})
+                GROUP BY C.e_c_6
+            `);
+ 
+            for (const row of result.recordset) {
+                data[`${dbName}|${row.REFID}`] = {
+                    ENQUIRY_RATE: row.HAS_PENDING_ENQUIRY_RATE === 0 ? 1 : 0,
+                    PURCHASE_RATE_ENTER: row.HAS_ADMIN_RATE === 1 ? 1 : 0,
+                };
+            }
+        }
+ 
+        res.json({ success: true, data });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
 module.exports = router;
