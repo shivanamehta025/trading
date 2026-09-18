@@ -742,12 +742,12 @@ router.post("/inventory-management", async (req, res) => {
       });
     }
 
-    if (!userId) {
+   /*  if (!userId) {
       return res.status(400).json({
         success: false,
         message: "userId is required"
       });
-    }
+    } */
 
     if (!warehouse) {
       return res.status(400).json({
@@ -771,11 +771,11 @@ router.post("/inventory-management", async (req, res) => {
         sql.NVarChar(200),
         warehouse
       )
-      .input(
-        "userid",
-        sql.NVarChar(50),
-        userId
-      )
+     .input(
+  "userid",
+  sql.NVarChar(50),
+  userId || null
+)
       .execute("A_SP_FOR_IMS_REPORT");
 
     console.log(
