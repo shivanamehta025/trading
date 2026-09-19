@@ -125,7 +125,7 @@ router.post('/enquiry-save', async (req, res) => {
         const {
             databaseName,
             e_3, e_4, e_6, intime, e_8, outtime,
-            e_10, e_11, e_12, e_13, e_14, e_15, unq, products
+            e_10, e_11, e_12, e_13, e_14, e_15, e_18, unq, products
         } = req.body;
  
         const pool = await getPool(databaseName);
@@ -144,6 +144,7 @@ router.post('/enquiry-save', async (req, res) => {
             .input('e_13', sql.NVarChar(50), e_13)
             .input('e_14', sql.NVarChar(sql.MAX), e_14)
             .input('e_15', sql.NVarChar(sql.MAX), e_15)
+            .input('e_18', sql.NVarChar(50), e_18)
             .input('unq', sql.NVarChar(50), unq)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
  
@@ -238,14 +239,14 @@ router.post('/enquiry-bind-data', async (req, res) => {
 
 router.post('/bind-rate', async (req, res) => {
     try {
-        const { databaseName, enquiryUnq, prounq, userid, formDate } = req.body;
+        const { databaseName, enquiryUnq, prounq, branch, formDate } = req.body;
         const pool = await getPool(databaseName);
 
         const result = await pool.request()
             .input('what', sql.NVarChar(50), 'bindrate')
             .input('e_c6', sql.NVarChar(50), enquiryUnq)
             .input('e_c8', sql.NVarChar(50), prounq)
-            .input('e_3', sql.Decimal(18, 2), userid)
+            .input('branch', sql.Decimal(18, 2), branch)
             .input('Fdate', sql.NVarChar(50), formDate)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
 
@@ -323,12 +324,13 @@ router.post('/enquiry-save-child-total', async (req, res) => {
 
 router.post('/enquiry-rem-stock', async (req, res) => {
     try {
-        const { databaseName, unq } = req.body;
+        const { databaseName, unq, branch } = req.body;
         const pool = await getPool(databaseName);
 
         const result = await pool.request()
             .input('what', sql.NVarChar(50), 'remstock')
             .input('unq', sql.NVarChar(50), unq)
+            .input('branch', sql.NVarChar(50), branch)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
 
         res.json({
@@ -730,4 +732,28 @@ router.post('/notification-action-status', async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 });
+ 
+router.post('/enquiry-user-branch', async (req, res) => {
+    try {
+        const { databaseName, userid } = req.body;
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'userbranch')
+            .input('userid', sql.NVarChar(50), userid)
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            data: result.recordset || []
+        });
+    } catch (err) {
+        console.error('USER BRANCH ERROR:', err);
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
+
 module.exports = router;
