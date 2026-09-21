@@ -909,4 +909,86 @@ router.post("/director-product-branch-detail", async (req, res) => {
   }
 });
 
+router.post('/purchase-analysis', async (req, res) => {
+
+    try {
+
+        const {
+            databaseName,
+            productId,
+            period,
+            dashboardDate
+        } = req.body;
+
+
+        if (!databaseName) {
+            return res.status(400).json({
+                error: 'databaseName is required'
+            });
+        }
+
+
+        if (!productId) {
+            return res.status(400).json({
+                error: 'productId is required'
+            });
+        }
+
+
+        const pool =
+            await getPool(databaseName);
+
+
+        const result =
+            await pool.request()
+
+                .input(
+                    'WHAT',
+                    sql.NVarChar(50),
+                    'PRODUCT_PURCHASE_ANALYSIS'
+                )
+
+                .input(
+                    'PERIOD',
+                    sql.NVarChar(20),
+                    period || 'MONTH'
+                )
+
+                .input(
+                    'PRODUCTID',
+                    sql.UniqueIdentifier,
+                    productId
+                )
+
+                .input(
+                    'DashboardDate',
+                    sql.Date,
+                    dashboardDate || new Date()
+                )
+
+                .execute(
+                    'A_SP_FOR_PURCHASE_ANALYSIS'
+                );
+
+
+        res.json(
+            result.recordsets
+        );
+
+    } catch (error) {
+
+        console.error(
+            'Purchase analysis error:',
+            error
+        );
+
+        res.status(500).json({
+            error:
+                'Failed to load purchase analysis',
+            details:
+                error.message
+        });
+    }
+});
+
 module.exports = router;
