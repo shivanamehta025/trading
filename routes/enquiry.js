@@ -246,7 +246,7 @@ router.post('/bind-rate', async (req, res) => {
             .input('what', sql.NVarChar(50), 'bindrate')
             .input('e_c6', sql.NVarChar(50), enquiryUnq)
             .input('e_c8', sql.NVarChar(50), prounq)
-            .input('branch', sql.Decimal(18, 2), branch)
+            .input('branch', sql.NVarChar(50), branch)
             .input('Fdate', sql.NVarChar(50), formDate)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
 
@@ -668,68 +668,65 @@ router.post('/enquiry-detail', async (req, res) => {
 router.post('/notification-action-status', async (req, res) => {
     try {
         const { items } = req.body;
- 
+
         if (!Array.isArray(items) || items.length === 0) {
-            return res.json({ success: true, data: {} });
+            return res.json({
+                success: true,
+                data: {}
+            });
         }
- 
-        const grouped = {};
-        for (const it of items) {
-            const refId = it?.referenceId;
-            const dbName = it?.databaseName;
-            if (!refId || !dbName) continue;
- 
-            if (!grouped[dbName]) grouped[dbName] = new Set();
-            grouped[dbName].add(refId);
-        }
- 
+
         const data = {};
- 
-        for (const dbName of Object.keys(grouped)) {
-            const refIds = Array.from(grouped[dbName]);
+
+        for (const item of items) {
+
+            const notificationId = item?.id;
+            const dbName = item?.databaseName;
+
+            if (!notificationId || !dbName) continue;
+
             const pool = await getPool(dbName);
-            const request = pool.request();
- 
-            const placeholders = refIds
-                .map((id, idx) => {
-                    const paramName = `ref${idx}`;
-                    request.input(paramName, sql.NVarChar(50), id);
-                    return `@${paramName}`;
-                })
-                .join(',');
- 
-            const result = await request.query(`
-                SELECT
-                    C.e_c_6 AS REFID,
-                    MAX(
-                        CASE
-                            WHEN LOWER(ISNULL(S.sm206_29, '')) <> 'truck'
-                                 AND C.e_c_14 IS NULL
-                            THEN 1 ELSE 0
-                        END
-                    ) AS HAS_PENDING_ENQUIRY_RATE,
-                    MAX(
-                        CASE WHEN C.e_c_19 IS NOT NULL THEN 1 ELSE 0 END
-                    ) AS HAS_ADMIN_RATE
- 
-                FROM enq_4_c C
-                INNER JOIN sm206 S ON S.sm206_2 = C.e_c_8
-                WHERE C.e_c_6 IN (${placeholders})
-                GROUP BY C.e_c_6
-            `);
- 
-            for (const row of result.recordset) {
-                data[`${dbName}|${row.REFID}`] = {
-                    ENQUIRY_RATE: row.HAS_PENDING_ENQUIRY_RATE === 0 ? 1 : 0,
-                    PURCHASE_RATE_ENTER: row.HAS_ADMIN_RATE === 1 ? 1 : 0,
-                };
-            }
+
+            const result = await pool.request()
+                .input(
+                    'notificationId',
+                    sql.Int,
+                    notificationId
+                )
+                .query(`
+                    SELECT
+                        ID,
+                        DOCUMENTTYPE,
+                        ACTIONDONE
+                    FROM APP_NOTIFICATION
+                    WHERE ID = @notificationId
+                `);
+
+            const row = result.recordset?.[0];
+
+            if (!row) continue;
+
+            data[`${dbName}|${notificationId}`] = {
+                ACTIONDONE: Number(row.ACTIONDONE) === 1 ? 1 : 0
+            };
         }
- 
-        res.json({ success: true, data });
+
+        return res.json({
+            success: true,
+            data
+        });
+
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: err.message });
+
+        console.error(
+            'NOTIFICATION ACTION STATUS ERROR:',
+            err
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
     }
 });
  
@@ -754,6 +751,293 @@ router.post('/enquiry-user-branch', async (req, res) => {
             message: err.message
         });
     }
+});
+
+router.post('/rate-whatsapp-data', async (req, res) => {
+  try {
+    const { databaseName, referenceId } = req.body;
+
+    if (!databaseName || !referenceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'databaseName and referenceId are required',
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input('what', sql.NVarChar(50), 'RATEWHATSAPP')
+      .input('unq', sql.NVarChar(50), referenceId)
+      .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+    const row = result.recordset?.[0];
+
+    if (!row) {
+      return res.json({
+        success: false,
+        message: 'Customer details not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      customerName: row.CUSTNAME?.toString() ?? '',
+      mobile: row.MOBILE?.toString() ?? '',
+    });
+
+  } catch (err) {
+    console.error('RATE WHATSAPP DATA ERROR:', err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+router.post('/update-notification-action', async (req, res) => {
+    try {
+        const {
+            databaseName,
+            notificationId
+        } = req.body;
+
+        if (!databaseName || !notificationId) {
+            return res.status(400).json({
+                success: false,
+                message: 'databaseName and notificationId are required'
+            });
+        }
+
+        const pool = await getPool(databaseName);
+
+        await pool.request()
+            .input(
+                'notificationId',
+                sql.Int,
+                notificationId
+            )
+            .query(`
+                UPDATE APP_NOTIFICATION
+                SET ACTIONDONE = 1
+                WHERE ID = @notificationId
+            `);
+
+        return res.json({
+            success: true,
+            message: 'Notification action updated successfully'
+        });
+
+    } catch (err) {
+
+        console.error(
+            'UPDATE NOTIFICATION ACTION ERROR:',
+            err
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
+
+// ================= SEND RATE ON WHATSAPP =================
+
+router.post('/send-rate-whatsapp', async (req, res) => {
+  try {
+    const {
+      databaseName,
+      notificationId
+    } = req.body;
+
+    if (!databaseName || !notificationId) {
+      return res.status(400).json({
+        success: false,
+        message: 'databaseName and notificationId are required'
+      });
+    }
+
+    // WhatsApp API key manually
+    const whatsappApiKey =
+      '384ab90d367149c2b63f7a22e9a1354a';
+
+    const pool = await getPool(databaseName);
+
+    // Notification ID se Reference ID nikalo
+    const notificationResult = await pool.request()
+      .input(
+        'notificationId',
+        sql.Int,
+        notificationId
+      )
+      .query(`
+        SELECT
+          ID,
+          REFERENCEID
+        FROM APP_NOTIFICATION
+        WHERE ID = @notificationId
+      `);
+
+    const notification =
+      notificationResult.recordset?.[0];
+
+    if (!notification) {
+      return res.json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    const referenceId =
+      notification.REFERENCEID?.toString().trim() ?? '';
+
+    if (!referenceId) {
+      return res.json({
+        success: false,
+        message: 'Enquiry reference is missing'
+      });
+    }
+
+    // RATEWHATSAPP SP call
+    const result = await pool.request()
+      .input(
+        'what',
+        sql.NVarChar(50),
+        'RATEWHATSAPP'
+      )
+      .input(
+        'unq',
+        sql.NVarChar(50),
+        referenceId
+      )
+      .execute(
+        'A_SP_FOR_ENQUIRYMASTER_APP'
+      );
+
+    const rows = result.recordset ?? [];
+
+    if (rows.length === 0) {
+      return res.json({
+        success: false,
+        message: 'Customer/rate details not found'
+      });
+    }
+
+    const firstRow = rows[0];
+
+    const customerName =
+      firstRow.CUSTNAME?.toString().trim() ?? '';
+
+    const mobile =
+      firstRow.MOBILE?.toString().trim() ?? '';
+
+    if (!customerName) {
+      return res.json({
+        success: false,
+        message: 'Customer name not found'
+      });
+    }
+
+    if (!mobile) {
+      return res.json({
+        success: false,
+        message: 'Customer mobile number not found'
+      });
+    }
+
+    // Multiple products
+    const rateLines = rows
+      .map((row) => {
+
+        const product =
+          row.PRODUCT?.toString().trim() ?? '';
+
+        const cash =
+          row.CASHAMT?.toString().trim() ?? '0';
+
+        const credit =
+          row.CREDITAMT?.toString().trim() ?? '0';
+
+        return (
+          `*Product:* '${product}'\n` +
+          `*Cash Rate:* ₹${cash}\n` +
+          `*Credit Rate:* ₹${credit}`
+        );
+
+      })
+      .join('\n\n');
+
+    // WhatsApp message
+    const message =
+      `Dear ${customerName},\n\n` +
+      `Thank you for showing interest in our products. ` +
+      `Please find below the rate details for your selected product:\n\n` +
+      `${rateLines}`;
+
+    // Existing WhatsApp API
+    const whatsappUrl = new URL(
+      'http://148.251.129.118/whatsapp/api/send'
+    );
+
+    whatsappUrl.searchParams.set(
+      'mobile',
+      mobile
+    );
+
+    whatsappUrl.searchParams.set(
+      'msg',
+      message
+    );
+
+    whatsappUrl.searchParams.set(
+      'apikey',
+      whatsappApiKey
+    );
+
+    const whatsappResponse = await fetch(
+      whatsappUrl.toString(),
+      {
+        method: 'GET'
+      }
+    );
+
+    const whatsappText =
+      await whatsappResponse.text();
+
+    console.log('WHATSAPP GATEWAY RESPONSE:', whatsappText);
+
+    if (!whatsappResponse.ok) {
+      return res.status(502).json({
+        success: false,
+        message: 'WhatsApp gateway failed',
+        gatewayResponse: whatsappText
+      });
+    }
+
+    // ACTIONDONE yahan update nahi hoga.
+    // Flutter successful response ke baad
+    // update-notification-action call karega.
+
+    return res.json({
+      success: true,
+      message: 'Rate sent on WhatsApp successfully',
+      gatewayResponse: whatsappText
+    });
+
+  } catch (err) {
+
+    console.error(
+      'SEND RATE WHATSAPP ERROR:',
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
 });
 
 module.exports = router;
