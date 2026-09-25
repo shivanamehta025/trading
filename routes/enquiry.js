@@ -812,17 +812,71 @@ router.post('/update-notification-action', async (req, res) => {
 
         const pool = await getPool(databaseName);
 
-        await pool.request()
+        // First current notification ki details nikalo
+        const notificationResult = await pool.request()
             .input(
                 'notificationId',
                 sql.Int,
                 notificationId
             )
             .query(`
-                UPDATE APP_NOTIFICATION
-                SET ACTIONDONE = 1
+                SELECT
+                    ID,
+                    DOCUMENTTYPE,
+                    REFERENCEID
+                FROM APP_NOTIFICATION
                 WHERE ID = @notificationId
             `);
+
+        const notification = notificationResult.recordset?.[0];
+
+        if (!notification) {
+            return res.status(404).json({
+                success: false,
+                message: 'Notification not found'
+            });
+        }
+
+        // =========================================================
+        // ENQUIRY_RATE
+        // Same enquiry ke Admin + Manager dono ke
+        // ENQUIRY_RATE notifications complete honge
+        // =========================================================
+        if (
+            notification.DOCUMENTTYPE === 'ENQUIRY_RATE' &&
+            notification.REFERENCEID
+        ) {
+            await pool.request()
+                .input(
+                    'referenceId',
+                    sql.VarChar,
+                    notification.REFERENCEID
+                )
+                .query(`
+                    UPDATE APP_NOTIFICATION
+                    SET ACTIONDONE = 1
+                    WHERE DOCUMENTTYPE = 'ENQUIRY_RATE'
+                      AND REFERENCEID = @referenceId
+                `);
+        }
+
+        // =========================================================
+        // Baaki notifications
+        // Sirf jis notification par action hua hai wahi complete hoga
+        // =========================================================
+        else {
+            await pool.request()
+                .input(
+                    'notificationId',
+                    sql.Int,
+                    notificationId
+                )
+                .query(`
+                    UPDATE APP_NOTIFICATION
+                    SET ACTIONDONE = 1
+                    WHERE ID = @notificationId
+                `);
+        }
 
         return res.json({
             success: true,
@@ -843,13 +897,12 @@ router.post('/update-notification-action', async (req, res) => {
     }
 });
 
-// ================= SEND RATE ON WHATSAPP =================
-
 router.post('/send-rate-whatsapp', async (req, res) => {
   try {
     const {
       databaseName,
-      notificationId
+      notificationId,
+      whatsappApiKey
     } = req.body;
 
     if (!databaseName || !notificationId) {
@@ -858,10 +911,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
         message: 'databaseName and notificationId are required'
       });
     }
-
-    // WhatsApp API key manually
-    const whatsappApiKey =
-      '384ab90d367149c2b63f7a22e9a1354a';
 
     const pool = await getPool(databaseName);
 
