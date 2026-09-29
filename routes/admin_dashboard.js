@@ -55,15 +55,34 @@ router.post("/director-sales-team", async (req, res) => {
 router.post("/manufacturerwise-purchase", async (req, res) => {
     try {
 
-        const { databaseName } = req.body;
+        const {
+            databaseName,
+            period = "MONTH"
+        } = req.body;
+
 
         const pool = await getPool(databaseName);
 
+
         const result = await pool.request()
-            .input("WHAT", sql.NVarChar(200), "MANUFACTURERWISE_PURCHASE")
+
+            .input(
+                "WHAT",
+                sql.NVarChar(200),
+                "MANUFACTURERWISE_PURCHASE"
+            )
+
+            .input(
+                "PERIOD",
+                sql.NVarChar(20),
+                period
+            )
+
             .execute("A_SP_FOR_DASHBOARD_ADMIN");
 
+
         res.json(result.recordset);
+
 
     } catch (error) {
 
@@ -71,6 +90,7 @@ router.post("/manufacturerwise-purchase", async (req, res) => {
             "Manufacturer purchase error:",
             error
         );
+
 
         res.status(500).json({
             success: false,
