@@ -1089,6 +1089,14 @@ router.post('/update-notification-action', async (req, res) => {
   }
 }); */
 
+// .env file me ye 3 values add kariye:
+// M2M_UID=40c19706-a0c8-41cd-a848-f8e6a3a66d4d
+// M2M_TOKEN=<naya regenerate kiya hua token>
+// M2M_PHONE_NUMBER_ID=1298767846643951
+//
+// Aur server.js me sabse upar (agar pehle se nahi hai):
+// require('dotenv').config();   // npm install dotenv
+
 router.post('/send-rate-whatsapp', async (req, res) => {
   try {
     const {
@@ -1116,137 +1124,145 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       });
     }
 
+    // ================= MART2META CONFIG =================
+    const YOURUID = process.env.M2M_UID;
+    const API_ACCESS_TOKEN = process.env.M2M_TOKEN;
+    const PHONE_NUMBER_ID = process.env.M2M_PHONE_NUMBER_ID;
 
-    const YOURUID = '40c19706-a0c8-41cd-a848-f8e6a3a66d4d';
-
-    const API_ACCESS_TOKEN =
-      'ELIv9RKUixN0PNods7BoCZhLP9dw4kASvY9Nd4ieKMoaGdEaxSFw6MLXCYiNCaJd';
-
-    const PHONE_NUMBER_ID =
-      '1298767846643951';
+    if (!YOURUID || !API_ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+      return res.status(500).json({
+        success: false,
+        message: 'WhatsApp gateway config missing in .env'
+      });
+    }
 
     const whatsappUrl =
       `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
 
-
-    const phoneNumber = mobile
+    // ---------------------------------------
+    // CLEAN MOBILE NUMBER (India: 91 add karo)
+    // ---------------------------------------
+    let phoneNumber = mobile
       .toString()
       .replace(/\D/g, '')
       .replace(/^0+/, '');
 
+    if (phoneNumber.length === 10) {
+      phoneNumber = '91' + phoneNumber;
+    }
+
+    if (phoneNumber.length < 11 || phoneNumber.length > 15) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid mobile number',
+        mobile: phoneNumber
+      });
+    }
+
+    // ---------------------------------------
+    // PARAMETERS -> ARRAY (+ CLEANUP)
+    // WhatsApp template params me newline/tab/
+    // multiple spaces allowed nahi hote
+    // ---------------------------------------
+    const cleanValue = (value) =>
+      (value ?? '')
+        .toString()
+        .replace(/[\n\r\t]+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
     let parameterList = [];
 
     if (Array.isArray(parameters)) {
-      parameterList = parameters.map(
-        value => value?.toString().trim() ?? ''
-      );
+      parameterList = parameters.map(cleanValue);
     } else {
       parameterList = parameters
         .toString()
         .split(',')
-        .map(value => value.trim());
+        .map(cleanValue);
     }
 
-    console.log(
-      'WHATSAPP PARAMETERS:',
-      parameterList
-    );
+    console.log('WHATSAPP PARAMETERS:', parameterList);
 
-    // Template rate_to_customer requires 4 parameters
-    if (parameterList.length !== 4) {
+    // Template rate_to_customer = 4 parameters
+    if (parameterList.length !== 4 || parameterList.some(p => !p)) {
       return res.status(400).json({
         success: false,
-        message:
-          'Exactly 4 WhatsApp template parameters are required',
+        message: 'Exactly 4 non-empty WhatsApp template parameters are required',
         parameters: parameterList
       });
     }
 
+    // ---------------------------------------
+    // MART2META REQUEST
+    // ---------------------------------------
     const requestBody = {
       from_phone_number_id: PHONE_NUMBER_ID,
       phone_number: phoneNumber,
       template_name: templateName,
       template_language: templateLanguage,
       template_media_type: 'simple',
-
-      // IMPORTANT:
-      // Send 4 separate parameters
       parameters: parameterList
     };
 
-    console.log(
-      'MART2META REQUEST:',
-      JSON.stringify(requestBody, null, 2)
-    );
+    console.log('MART2META URL:', whatsappUrl);
+    console.log('MART2META REQUEST:', JSON.stringify(requestBody, null, 2));
 
-    const whatsappResponse = await fetch(
-      whatsappUrl,
-      {
-        method: 'POST',
+    const whatsappResponse = await fetch(whatsappUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(requestBody)
+    });
 
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization':
-            `Bearer ${API_ACCESS_TOKEN}`
-        },
+    const whatsappText = await whatsappResponse.text();
 
-        body: JSON.stringify(requestBody)
-      }
-    );
-
-    const whatsappText =
-      await whatsappResponse.text();
-
-    console.log(
-      'MART2META RESPONSE:',
-      whatsappText
-    );
+    console.log('MART2META STATUS:', whatsappResponse.status);
+    console.log('MART2META RESPONSE:', whatsappText);
 
     let gatewayData = null;
-
     try {
       gatewayData = JSON.parse(whatsappText);
     } catch (parseError) {
       gatewayData = null;
     }
 
-
-    if (
+    // ---------------------------------------
+    // ERROR CHECK
+    // ---------------------------------------
+    const gatewayFailed =
       !whatsappResponse.ok ||
-      gatewayData?.error
-    ) {
-      console.error(
-        'MART2META WHATSAPP ERROR:',
-        gatewayData?.error || whatsappText
-      );
+      gatewayData?.error ||
+      gatewayData?.success === false ||
+      gatewayData?.status === 'error';
+
+    if (gatewayFailed) {
+      console.error('MART2META WHATSAPP ERROR:', gatewayData || whatsappText);
 
       return res.status(502).json({
         success: false,
         message:
           gatewayData?.error?.message ||
+          gatewayData?.message ||
           'WhatsApp gateway failed',
-
-        gatewayResponse:
-          gatewayData || whatsappText
+        gatewayStatus: whatsappResponse.status,
+        gatewayResponse: gatewayData || whatsappText
       });
     }
 
-
+    // ---------------------------------------
+    // SUCCESS
+    // ---------------------------------------
     return res.json({
       success: true,
-      message:
-        'Rate sent on WhatsApp successfully',
-
-      gatewayResponse:
-        gatewayData || whatsappText
+      message: 'Rate sent on WhatsApp successfully',
+      gatewayResponse: gatewayData || whatsappText
     });
 
   } catch (err) {
-
-    console.error(
-      'SEND RATE WHATSAPP ERROR:',
-      err
-    );
+    console.error('SEND RATE WHATSAPP ERROR:', err);
 
     return res.status(500).json({
       success: false,
