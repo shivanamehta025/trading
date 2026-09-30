@@ -897,7 +897,7 @@ router.post('/update-notification-action', async (req, res) => {
     }
 });
 
-router.post('/send-rate-whatsapp', async (req, res) => {
+/* router.post('/send-rate-whatsapp', async (req, res) => {
   try {
     const {
       databaseName,
@@ -1077,6 +1077,126 @@ router.post('/send-rate-whatsapp', async (req, res) => {
 
   } catch (err) {
 
+    console.error(
+      'SEND RATE WHATSAPP ERROR:',
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+}); */
+
+router.post('/send-rate-whatsapp', async (req, res) => {
+  try {
+    const {
+      databaseName,
+      notificationId,
+      mobile,
+      message,
+      templateName,
+      templateLanguage,
+      parameters
+    } = req.body;
+
+    if (
+      !databaseName ||
+      !notificationId ||
+      !mobile ||
+      !message ||
+      !templateName ||
+      !templateLanguage ||
+      !parameters
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Required WhatsApp details are missing'
+      });
+    }
+
+
+    const YOURUID = '40c19706-a0c8-41cd-a848-f8e6a3a66d4d';
+
+    const API_ACCESS_TOKEN =
+      'ELIv9RKUixN0PNods7BoCZhLP9dw4kASvY9Nd4ieKMoaGdEaxSFw6MLXCYiNCaJd';
+
+    const PHONE_NUMBER_ID =
+      '1298767846643951';
+
+
+    const whatsappUrl =
+      `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
+
+
+    const phoneNumber = mobile
+      .toString()
+      .replace(/\D/g, '')
+      .replace(/^0+/, '');
+
+
+    const requestBody = {
+      from_phone_number_id: PHONE_NUMBER_ID,
+
+      phone_number: phoneNumber,
+
+      template_name: templateName,
+
+      template_language: templateLanguage,
+
+      template_media_type: 'simple',
+
+      parameters: parameters
+    };
+
+    console.log(
+      'MART2META REQUEST:',
+      requestBody
+    );
+
+
+    const whatsappResponse = await fetch(
+      whatsappUrl,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type': 'application/json',
+
+          'Authorization':
+            `Bearer ${API_ACCESS_TOKEN}`
+        },
+
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    const whatsappText =
+      await whatsappResponse.text();
+
+    console.log(
+      'MART2META RESPONSE:',
+      whatsappText
+    );
+
+
+    if (!whatsappResponse.ok) {
+      return res.status(502).json({
+        success: false,
+        message: 'WhatsApp gateway failed',
+        gatewayResponse: whatsappText
+      });
+    }
+
+
+    return res.json({
+      success: true,
+      message: 'Rate sent on WhatsApp successfully',
+      gatewayResponse: whatsappText
+    });
+
+  } catch (err) {
     console.error(
       'SEND RATE WHATSAPP ERROR:',
       err
