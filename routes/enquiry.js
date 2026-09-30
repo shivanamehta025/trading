@@ -1125,7 +1125,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
     const PHONE_NUMBER_ID =
       '1298767846643951';
 
-
     const whatsappUrl =
       `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
 
@@ -1135,26 +1134,50 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       .replace(/\D/g, '')
       .replace(/^0+/, '');
 
+    let parameterList = [];
+
+    if (Array.isArray(parameters)) {
+      parameterList = parameters.map(
+        value => value?.toString().trim() ?? ''
+      );
+    } else {
+      parameterList = parameters
+        .toString()
+        .split(',')
+        .map(value => value.trim());
+    }
+
+    console.log(
+      'WHATSAPP PARAMETERS:',
+      parameterList
+    );
+
+    // Template rate_to_customer requires 4 parameters
+    if (parameterList.length !== 4) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Exactly 4 WhatsApp template parameters are required',
+        parameters: parameterList
+      });
+    }
 
     const requestBody = {
       from_phone_number_id: PHONE_NUMBER_ID,
-
       phone_number: phoneNumber,
-
       template_name: templateName,
-
       template_language: templateLanguage,
-
       template_media_type: 'simple',
 
-      parameters: parameters
+      // IMPORTANT:
+      // Send 4 separate parameters
+      parameters: parameterList
     };
 
     console.log(
       'MART2META REQUEST:',
-      requestBody
+      JSON.stringify(requestBody, null, 2)
     );
-
 
     const whatsappResponse = await fetch(
       whatsappUrl,
@@ -1163,7 +1186,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
 
         headers: {
           'Content-Type': 'application/json',
-
           'Authorization':
             `Bearer ${API_ACCESS_TOKEN}`
         },
@@ -1180,23 +1202,47 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       whatsappText
     );
 
+    let gatewayData = null;
 
-    if (!whatsappResponse.ok) {
+    try {
+      gatewayData = JSON.parse(whatsappText);
+    } catch (parseError) {
+      gatewayData = null;
+    }
+
+
+    if (
+      !whatsappResponse.ok ||
+      gatewayData?.error
+    ) {
+      console.error(
+        'MART2META WHATSAPP ERROR:',
+        gatewayData?.error || whatsappText
+      );
+
       return res.status(502).json({
         success: false,
-        message: 'WhatsApp gateway failed',
-        gatewayResponse: whatsappText
+        message:
+          gatewayData?.error?.message ||
+          'WhatsApp gateway failed',
+
+        gatewayResponse:
+          gatewayData || whatsappText
       });
     }
 
 
     return res.json({
       success: true,
-      message: 'Rate sent on WhatsApp successfully',
-      gatewayResponse: whatsappText
+      message:
+        'Rate sent on WhatsApp successfully',
+
+      gatewayResponse:
+        gatewayData || whatsappText
     });
 
   } catch (err) {
+
     console.error(
       'SEND RATE WHATSAPP ERROR:',
       err
