@@ -1124,7 +1124,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       });
     }
 
-    // ================= MART2META CONFIG =================
     const YOURUID = process.env.M2M_UID;
     const API_ACCESS_TOKEN = process.env.M2M_TOKEN;
     const PHONE_NUMBER_ID = process.env.M2M_PHONE_NUMBER_ID;
@@ -1139,9 +1138,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
     const whatsappUrl =
       `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
 
-    // ---------------------------------------
-    // CLEAN MOBILE NUMBER (India: 91 add karo)
-    // ---------------------------------------
     let phoneNumber = mobile
       .toString()
       .replace(/\D/g, '')
@@ -1159,11 +1155,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       });
     }
 
-    // ---------------------------------------
-    // PARAMETERS -> ARRAY (+ CLEANUP)
-    // WhatsApp template params me newline/tab/
-    // multiple spaces allowed nahi hote
-    // ---------------------------------------
     const cleanValue = (value) =>
       (value ?? '')
         .toString()
@@ -1184,7 +1175,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
 
     console.log('WHATSAPP PARAMETERS:', parameterList);
 
-    // Template rate_to_customer = 4 parameters
     if (parameterList.length !== 4 || parameterList.some(p => !p)) {
       return res.status(400).json({
         success: false,
@@ -1193,9 +1183,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       });
     }
 
-    // ---------------------------------------
-    // MART2META REQUEST
-    // ---------------------------------------
     const requestBody = {
       from_phone_number_id: PHONE_NUMBER_ID,
       phone_number: phoneNumber,
@@ -1229,9 +1216,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       gatewayData = null;
     }
 
-    // ---------------------------------------
-    // ERROR CHECK
-    // ---------------------------------------
     const gatewayFailed =
       !whatsappResponse.ok ||
       gatewayData?.error ||
@@ -1252,9 +1236,6 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       });
     }
 
-    // ---------------------------------------
-    // SUCCESS
-    // ---------------------------------------
     return res.json({
       success: true,
       message: 'Rate sent on WhatsApp successfully',
@@ -1270,5 +1251,4 @@ router.post('/send-rate-whatsapp', async (req, res) => {
     });
   }
 });
-
 module.exports = router;
