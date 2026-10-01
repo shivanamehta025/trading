@@ -1011,4 +1011,31 @@ router.post('/purchase-analysis', async (req, res) => {
     }
 });
 
+router.post("/today-sales-profit", async (req, res) => {
+  try {
+    const { databaseName } = req.body;
+
+    if (!databaseName) {
+      return res.status(400).json({
+        error: "databaseName is required",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+      .input("WHAT", sql.VarChar, "TODAY_SALES_PROFIT")
+      .execute("A_SP_FOR_DASHBOARD_ADMIN");
+
+    return res.json(result.recordsets);
+  } catch (error) {
+    console.error("TODAY SALES PROFIT ERROR:", error);
+
+    return res.status(500).json({
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;
