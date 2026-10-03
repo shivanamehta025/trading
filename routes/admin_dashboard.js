@@ -1075,4 +1075,154 @@ router.post("/director-outstanding", async (req, res) => {
   }
 });
 
+router.post("/director-outstanding-poke", async (req, res) => {
+  try {
+
+    const {
+      databaseName,
+      customerUnq,
+      customerName,
+      salespersonUserId,
+      totalDueAmount,
+      dueDays,
+    } = req.body;
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "databaseName is required",
+      });
+    }
+
+    if (!salespersonUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "salespersonUserId is required",
+      });
+    }
+
+    if (!customerUnq) {
+      return res.status(400).json({
+        success: false,
+        message: "customerUnq is required",
+      });
+    }
+
+    /*
+     * HERE USE YOUR EXISTING FCM TOKEN TABLE.
+     *
+     * Don't create a new token system.
+     */
+
+    const pool = await getPool(databaseName);
+
+    // Your existing FCM-token lookup goes here.
+
+    // Example:
+    //
+    // const tokenResult = await pool.request()
+    //   .input("UserId", sql.VarChar, salespersonUserId)
+    //   .query(`
+    //       SELECT TOP 1 FCMToken
+    //       FROM ...
+    //       WHERE UserId = @UserId
+    //   `);
+
+    /*
+     * Once you get the token:
+     */
+
+    const token = "EXISTING_FCM_TOKEN";
+
+    const amount = Number(
+      totalDueAmount || 0
+    );
+
+    let amountText;
+
+    if (amount >= 10000000) {
+
+      amountText =
+        `₹ ${(amount / 10000000).toFixed(2)} Cr`;
+
+    } else if (amount >= 100000) {
+
+      amountText =
+        `₹ ${(amount / 100000).toFixed(2)} L`;
+
+    } else {
+
+      amountText =
+        `₹ ${amount.toFixed(0)}`;
+    }
+
+    const message = {
+
+      token: token,
+
+      notification: {
+
+        title: "Collection Required",
+
+        body:
+          `Please collect ${amountText} ` +
+          `from ${customerName}. ` +
+          `Outstanding is ${dueDays} days old.`,
+      },
+
+      data: {
+
+        type:
+          "OUTSTANDING_COLLECTION",
+
+        databaseName:
+          String(databaseName),
+
+        customerUnq:
+          String(customerUnq),
+
+        customerName:
+          String(customerName),
+
+        salespersonUserId:
+          String(salespersonUserId),
+
+        totalDueAmount:
+          String(totalDueAmount || 0),
+
+        dueDays:
+          String(dueDays || 0),
+      },
+    };
+
+    const response =
+      await admin.messaging().send(message);
+
+    return res.json({
+
+      success: true,
+
+      message:
+        "Collection alert sent successfully",
+
+      messageId:
+        response,
+    });
+
+  } catch (error) {
+
+    console.error(
+      "DIRECTOR OUTSTANDING POKE ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      message: error.message,
+    });
+  }
+});
+
 module.exports = router;

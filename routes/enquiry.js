@@ -162,6 +162,7 @@ router.post('/enquiry-save', async (req, res) => {
                 .input('e_c10', sql.NVarChar(50), p.e_c10)
                 .input('e_c11', sql.NVarChar(50), p.e_c11)
                 .input('e_c12', sql.NVarChar(sql.MAX), p.e_c12)
+                .input('e_c14', sql.Decimal(18, 2), p.e_c14 || null)
                 .input('e_c18', sql.NVarChar(sql.MAX), p.e_c18)
 
                 .execute('A_SP_FOR_ENQUIRYMASTER_APP');
@@ -897,205 +898,6 @@ router.post('/update-notification-action', async (req, res) => {
     }
 });
 
-/* router.post('/send-rate-whatsapp', async (req, res) => {
-  try {
-    const {
-      databaseName,
-      notificationId,
-      whatsappApiKey
-    } = req.body;
-
-    if (!databaseName || !notificationId) {
-      return res.status(400).json({
-        success: false,
-        message: 'databaseName and notificationId are required'
-      });
-    }
-
-    const pool = await getPool(databaseName);
-
-    // Notification ID se Reference ID nikalo
-    const notificationResult = await pool.request()
-      .input(
-        'notificationId',
-        sql.Int,
-        notificationId
-      )
-      .query(`
-        SELECT
-          ID,
-          REFERENCEID
-        FROM APP_NOTIFICATION
-        WHERE ID = @notificationId
-      `);
-
-    const notification =
-      notificationResult.recordset?.[0];
-
-    if (!notification) {
-      return res.json({
-        success: false,
-        message: 'Notification not found'
-      });
-    }
-
-    const referenceId =
-      notification.REFERENCEID?.toString().trim() ?? '';
-
-    if (!referenceId) {
-      return res.json({
-        success: false,
-        message: 'Enquiry reference is missing'
-      });
-    }
-
-    // RATEWHATSAPP SP call
-    const result = await pool.request()
-      .input(
-        'what',
-        sql.NVarChar(50),
-        'RATEWHATSAPP'
-      )
-      .input(
-        'unq',
-        sql.NVarChar(50),
-        referenceId
-      )
-      .execute(
-        'A_SP_FOR_ENQUIRYMASTER_APP'
-      );
-
-    const rows = result.recordset ?? [];
-
-    if (rows.length === 0) {
-      return res.json({
-        success: false,
-        message: 'Customer/rate details not found'
-      });
-    }
-
-    const firstRow = rows[0];
-
-    const customerName =
-      firstRow.CUSTNAME?.toString().trim() ?? '';
-
-    const mobile =
-      firstRow.MOBILE?.toString().trim() ?? '';
-
-    if (!customerName) {
-      return res.json({
-        success: false,
-        message: 'Customer name not found'
-      });
-    }
-
-    if (!mobile) {
-      return res.json({
-        success: false,
-        message: 'Customer mobile number not found'
-      });
-    }
-
-    // Multiple products
-    const rateLines = rows
-      .map((row) => {
-
-        const product =
-          row.PRODUCT?.toString().trim() ?? '';
-
-        const cash =
-          row.CASHAMT?.toString().trim() ?? '0';
-
-        const credit =
-          row.CREDITAMT?.toString().trim() ?? '0';
-
-        return (
-          `*Product:* '${product}'\n` +
-          `*Cash Rate:* ₹${cash}\n` +
-          `*Credit Rate:* ₹${credit}`
-        );
-
-      })
-      .join('\n\n');
-
-    // WhatsApp message
-    const message =
-      `Dear ${customerName},\n\n` +
-      `Thank you for showing interest in our products. ` +
-      `Please find below the rate details for your selected product:\n\n` +
-      `${rateLines}`;
-
-    // Existing WhatsApp API
-    const whatsappUrl = new URL(
-      'http://148.251.129.118/whatsapp/api/send'
-    );
-
-    whatsappUrl.searchParams.set(
-      'mobile',
-      mobile
-    );
-
-    whatsappUrl.searchParams.set(
-      'msg',
-      message
-    );
-
-    whatsappUrl.searchParams.set(
-      'apikey',
-      whatsappApiKey
-    );
-
-    const whatsappResponse = await fetch(
-      whatsappUrl.toString(),
-      {
-        method: 'GET'
-      }
-    );
-
-    const whatsappText =
-      await whatsappResponse.text();
-
-    console.log('WHATSAPP GATEWAY RESPONSE:', whatsappText);
-
-    if (!whatsappResponse.ok) {
-      return res.status(502).json({
-        success: false,
-        message: 'WhatsApp gateway failed',
-        gatewayResponse: whatsappText
-      });
-    }
-
-    // ACTIONDONE yahan update nahi hoga.
-    // Flutter successful response ke baad
-    // update-notification-action call karega.
-
-    return res.json({
-      success: true,
-      message: 'Rate sent on WhatsApp successfully',
-      gatewayResponse: whatsappText
-    });
-
-  } catch (err) {
-
-    console.error(
-      'SEND RATE WHATSAPP ERROR:',
-      err
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: err.message
-    });
-  }
-}); */
-
-// .env file me ye 3 values add kariye:
-// M2M_UID=40c19706-a0c8-41cd-a848-f8e6a3a66d4d
-// M2M_TOKEN=<naya regenerate kiya hua token>
-// M2M_PHONE_NUMBER_ID=1298767846643951
-//
-// Aur server.js me sabse upar (agar pehle se nahi hai):
-// require('dotenv').config();   // npm install dotenv
 
 router.post('/send-rate-whatsapp', async (req, res) => {
   try {
@@ -1124,6 +926,7 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       });
     }
 
+    // ================= MART2META CONFIG =================
     const YOURUID = process.env.M2M_UID;
     const API_ACCESS_TOKEN = process.env.M2M_TOKEN;
     const PHONE_NUMBER_ID = process.env.M2M_PHONE_NUMBER_ID;
@@ -1138,6 +941,9 @@ router.post('/send-rate-whatsapp', async (req, res) => {
     const whatsappUrl =
       `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
 
+    // ---------------------------------------
+    // CLEAN MOBILE NUMBER (India: 91 add karo)
+    // ---------------------------------------
     let phoneNumber = mobile
       .toString()
       .replace(/\D/g, '')
@@ -1155,6 +961,11 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       });
     }
 
+    // ---------------------------------------
+    // PARAMETERS -> ARRAY (+ CLEANUP)
+    // WhatsApp template params me newline/tab/
+    // multiple spaces allowed nahi hote
+    // ---------------------------------------
     const cleanValue = (value) =>
       (value ?? '')
         .toString()
@@ -1175,6 +986,7 @@ router.post('/send-rate-whatsapp', async (req, res) => {
 
     console.log('WHATSAPP PARAMETERS:', parameterList);
 
+    // Template rate_to_customer = 4 parameters
     if (parameterList.length !== 4 || parameterList.some(p => !p)) {
       return res.status(400).json({
         success: false,
@@ -1183,6 +995,9 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       });
     }
 
+    // ---------------------------------------
+    // MART2META REQUEST
+    // ---------------------------------------
     const requestBody = {
       from_phone_number_id: PHONE_NUMBER_ID,
       phone_number: phoneNumber,
@@ -1216,6 +1031,9 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       gatewayData = null;
     }
 
+    // ---------------------------------------
+    // ERROR CHECK
+    // ---------------------------------------
     const gatewayFailed =
       !whatsappResponse.ok ||
       gatewayData?.error ||
@@ -1236,6 +1054,9 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       });
     }
 
+    // ---------------------------------------
+    // SUCCESS
+    // ---------------------------------------
     return res.json({
       success: true,
       message: 'Rate sent on WhatsApp successfully',
@@ -1251,4 +1072,34 @@ router.post('/send-rate-whatsapp', async (req, res) => {
     });
   }
 });
+
+router.post('/enquiry-customer-products', async (req, res) => {
+    try {
+        const {
+            databaseName,
+            customerUnq
+        } = req.body;
+
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'customerproduct')
+            .input('CUSTNAME', sql.NVarChar(50), customerUnq || '')
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            customerProduct: result.recordset || []
+        });
+
+    } catch (err) {
+        console.error(err);
+
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
+
 module.exports = router;
