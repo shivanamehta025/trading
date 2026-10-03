@@ -1075,7 +1075,9 @@ router.post("/director-outstanding", async (req, res) => {
   }
 });
 
-router.post("/director-outstanding-poke", async (req, res) => {
+const sendNotification = require("./services/firebaseNotification");
+
+app.post("/api/director-outstanding-poke", async (req, res) => {
   try {
 
     const {
@@ -1094,13 +1096,6 @@ router.post("/director-outstanding-poke", async (req, res) => {
       });
     }
 
-    if (!salespersonUserId) {
-      return res.status(400).json({
-        success: false,
-        message: "salespersonUserId is required",
-      });
-    }
-
     if (!customerUnq) {
       return res.status(400).json({
         success: false,
@@ -1108,35 +1103,20 @@ router.post("/director-outstanding-poke", async (req, res) => {
       });
     }
 
-    /*
-     * HERE USE YOUR EXISTING FCM TOKEN TABLE.
-     *
-     * Don't create a new token system.
-     */
+    if (!salespersonUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "salespersonUserId is required",
+      });
+    }
 
     const pool = await getPool(databaseName);
 
-    // Your existing FCM-token lookup goes here.
+    // =========================================================
+    // FORMAT AMOUNT
+    // =========================================================
 
-    // Example:
-    //
-    // const tokenResult = await pool.request()
-    //   .input("UserId", sql.VarChar, salespersonUserId)
-    //   .query(`
-    //       SELECT TOP 1 FCMToken
-    //       FROM ...
-    //       WHERE UserId = @UserId
-    //   `);
-
-    /*
-     * Once you get the token:
-     */
-
-    const token = "EXISTING_FCM_TOKEN";
-
-    const amount = Number(
-      totalDueAmount || 0
-    );
+    const amount = Number(totalDueAmount || 0);
 
     let amountText;
 
@@ -1150,77 +1130,175 @@ router.post("/director-outstanding-poke", async (req, res) => {
       amountText =
         `₹ ${(amount / 100000).toFixed(2)} L`;
 
+    } else if (amount >= 1000) {
+
+      amountText =
+        `₹ ${(amount / 1000).toFixed(2)} K`;
+
     } else {
 
       amountText =
         `₹ ${amount.toFixed(0)}`;
     }
 
-    const message = {
+    // =========================================================
+    // NOTIFICATION MESSAGE
+    // =========================================================
 
-      token: token,
+    const title = "Collection Required";
 
-      notification: {
+    const message =
+      `Please collect ${amountText} from ` +
+      `${customerName}. Outstanding is ` +
+      `${dueDays} days old.`;
 
-        title: "Collection Required",
+    console.log(
+      "Poke Target User:",
+      salespersonUserId
+    );
 
-        body:
-          `Please collect ${amountText} ` +
-          `from ${customerName}. ` +
-          `Outstanding is ${dueDays} days old.`,
-      },
+    console.log(
+      "Customer:",
+      customerName
+    );
 
-      data: {
+    console.log(
+      "Outstanding:",
+      amountText
+    );
 
-        type:
-          "OUTSTANDING_COLLECTION",
+    // =========================================================
+    // SAVE NOTIFICATION IN DATABASE
+    // =========================================================
 
-        databaseName:
-          String(databaseName),
+    await pool
+      .request()
 
-        customerUnq:
-          String(customerUnq),
+      .input(
+        "USERID",
+        sql.VarChar,
+        salespersonUserId
+      )
 
-        customerName:
-          String(customerName),
+      .input(
+        "TITLE",
+        sql.VarChar,
+        title
+      )
 
-        salespersonUserId:
-          String(salespersonUserId),
+      .input(
+        "MESSAGE",
+        sql.NVarChar,
+        message
+      )
 
-        totalDueAmount:
-          String(totalDueAmount || 0),
+      .input(
+        "REFERENCEID",
+        sql.VarChar,
+        customerUnq
+      )
 
-        dueDays:
-          String(dueDays || 0),
-      },
-    };
+      .input(
+        "DATABASENAME",
+        sql.VarChar,
+        databaseName
+      )
 
-    const response =
-      await admin.messaging().send(message);
+      .query(`
+        INSERT INTO APP_NOTIFICATION
+        (
+          USERID,
+          TITLE,
+          MESSAGE,
+          REFERENCEID,
+          DATABASENAME
+        )
+        VALUES
+        (
+          @USERID,
+          @TITLE,
+          @MESSAGE,
+          @REFERENCEID,
+          @DATABASENAME
+        )
+      `);
+
+    // =========================================================
+    // GET SALESPERSON DEVICE TOKEN
+    // =========================================================
+
+    const companyPool = await getPool();
+
+    const tokenResult = await companyPool
+      .request()
+
+      .input(
+        "userId",
+        sql.VarChar,
+        salespersonUserId
+      )
+
+      .query(`
+        SELECT DEVICETOKEN
+        FROM APP_DEVICE_TOKEN
+        WHERE USERID = @userId
+      `);
+
+    // =========================================================
+    // SEND PUSH NOTIFICATION
+    // =========================================================
+
+    if (tokenResult.recordset.length > 0) {
+
+      const token =
+        tokenResult.recordset[0].DEVICETOKEN;
+
+      if (token) {
+
+        await sendNotification(
+          token,
+          title,
+          message
+        );
+
+        console.log(
+          "Poke notification sent successfully"
+        );
+
+      } else {
+
+        console.log(
+          "Salesperson device token is empty"
+        );
+      }
+
+    } else {
+
+      console.log(
+        "Salesperson device token not found:",
+        salespersonUserId
+      );
+    }
+
+    // =========================================================
+    // RESPONSE
+    // =========================================================
 
     return res.json({
-
       success: true,
-
-      message:
-        "Collection alert sent successfully",
-
-      messageId:
-        response,
+      message: "Collection alert sent successfully",
     });
 
-  } catch (error) {
+  } catch (err) {
 
     console.error(
       "DIRECTOR OUTSTANDING POKE ERROR:",
-      error
+      err
     );
 
     return res.status(500).json({
-
       success: false,
-
-      message: error.message,
+      message: err.message,
     });
   }
 });
