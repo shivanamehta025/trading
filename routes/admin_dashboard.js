@@ -3,6 +3,7 @@ const router = express.Router();
 
 const sql = require("mssql");
 const { getPool } = require("../config/db");
+const sendNotification = require("../services/firebaseNotification");
 
 router.post("/director-dashboard", async (req, res) => {
     try {
@@ -1074,8 +1075,6 @@ router.post("/director-outstanding", async (req, res) => {
     });
   }
 });
-
-const sendNotification = require("./services/firebaseNotification");
 
 router.post("/director-outstanding-poke", async (req, res) => {
   try {
