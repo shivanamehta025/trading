@@ -1077,7 +1077,7 @@ router.post("/director-outstanding", async (req, res) => {
 
 const sendNotification = require("./services/firebaseNotification");
 
-app.post("/api/director-outstanding-poke", async (req, res) => {
+router.post("/director-outstanding-poke", async (req, res) => {
   try {
 
     const {
