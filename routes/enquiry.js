@@ -163,6 +163,7 @@ router.post('/enquiry-save', async (req, res) => {
                 .input('e_c11', sql.NVarChar(50), p.e_c11)
                 .input('e_c12', sql.NVarChar(sql.MAX), p.e_c12)
                 .input('e_c14', sql.Decimal(18, 2), p.e_c14 || null)
+                .input('e_c16', sql.Decimal(18, 2), p.e_c16 || 0)
                 .input('e_c18', sql.NVarChar(sql.MAX), p.e_c18)
 
                 .execute('A_SP_FOR_ENQUIRYMASTER_APP');
@@ -797,6 +798,190 @@ router.post('/rate-whatsapp-data', async (req, res) => {
   }
 });
 
+
+router.post('/send-rate-whatsapp', async (req, res) => {
+  try {
+    const {
+      databaseName,
+      notificationId,
+      mobile,
+      message,
+      templateName,
+      templateLanguage,
+      parameters
+    } = req.body;
+
+    // notificationId is optional because EnquiryScreen automatic
+    // WhatsApp send does not have a notification ID.
+    if (
+      !databaseName ||
+      !mobile ||
+      !message ||
+      !templateName ||
+      !templateLanguage ||
+      !parameters
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Required WhatsApp details are missing'
+      });
+    }
+
+    const YOURUID = process.env.M2M_UID;
+    const API_ACCESS_TOKEN = process.env.M2M_TOKEN;
+    const PHONE_NUMBER_ID = process.env.M2M_PHONE_NUMBER_ID;
+
+    if (!YOURUID || !API_ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+      return res.status(500).json({
+        success: false,
+        message: 'WhatsApp gateway config missing in .env'
+      });
+    }
+
+    const whatsappUrl =
+      `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
+
+    let phoneNumber = mobile
+      .toString()
+      .replace(/\D/g, '')
+      .replace(/^0+/, '');
+
+    if (phoneNumber.length === 10) {
+      phoneNumber = '91' + phoneNumber;
+    }
+
+    if (phoneNumber.length < 11 || phoneNumber.length > 15) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid mobile number',
+        mobile: phoneNumber
+      });
+    }
+
+    const cleanValue = (value) =>
+      (value ?? '')
+        .toString()
+        .replace(/[\n\r\t]+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    let parameterList = [];
+
+    if (Array.isArray(parameters)) {
+      parameterList = parameters.map(cleanValue);
+    } else {
+      parameterList = parameters
+        .toString()
+        .split(',')
+        .map(cleanValue);
+    }
+
+    console.log('WHATSAPP PARAMETERS:', parameterList);
+
+    // ============================================================
+    // TEMPLATE HAS EXACTLY 3 PARAMETERS
+    //
+    // {{1}} = Customer Name
+    // {{2}} = Product + Rate List
+    // {{3}} = Advance
+    // ============================================================
+
+    if (parameterList.length !== 3 || parameterList.some(p => !p)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Exactly 3 non-empty WhatsApp template parameters are required',
+        parameters: parameterList
+      });
+    }
+
+    const requestBody = {
+      from_phone_number_id: PHONE_NUMBER_ID,
+      phone_number: phoneNumber,
+      template_name: templateName,
+      template_language: templateLanguage,
+      template_media_type: 'simple',
+      parameters: parameterList
+    };
+
+    console.log('MART2META URL:', whatsappUrl);
+
+    console.log(
+      'MART2META REQUEST:',
+      JSON.stringify(requestBody, null, 2)
+    );
+
+    const whatsappResponse = await fetch(whatsappUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const whatsappText = await whatsappResponse.text();
+
+    console.log(
+      'MART2META STATUS:',
+      whatsappResponse.status
+    );
+
+    console.log(
+      'MART2META RESPONSE:',
+      whatsappText
+    );
+
+    let gatewayData = null;
+
+    try {
+      gatewayData = JSON.parse(whatsappText);
+    } catch (parseError) {
+      gatewayData = null;
+    }
+
+    const gatewayFailed =
+      !whatsappResponse.ok ||
+      gatewayData?.error ||
+      gatewayData?.success === false ||
+      gatewayData?.status === 'error';
+
+    if (gatewayFailed) {
+      console.error(
+        'MART2META WHATSAPP ERROR:',
+        gatewayData || whatsappText
+      );
+
+      return res.status(502).json({
+        success: false,
+        message:
+          gatewayData?.error?.message ||
+          gatewayData?.message ||
+          'WhatsApp gateway failed',
+        gatewayStatus: whatsappResponse.status,
+        gatewayResponse: gatewayData || whatsappText
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Rate sent on WhatsApp successfully',
+      gatewayResponse: gatewayData || whatsappText
+    });
+
+  } catch (err) {
+    console.error(
+      'SEND RATE WHATSAPP ERROR:',
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
+
 router.post('/update-notification-action', async (req, res) => {
     try {
         const {
@@ -896,181 +1081,6 @@ router.post('/update-notification-action', async (req, res) => {
             message: err.message
         });
     }
-});
-
-
-router.post('/send-rate-whatsapp', async (req, res) => {
-  try {
-    const {
-      databaseName,
-      notificationId,
-      mobile,
-      message,
-      templateName,
-      templateLanguage,
-      parameters
-    } = req.body;
-
-    if (
-      !databaseName ||
-      !notificationId ||
-      !mobile ||
-      !message ||
-      !templateName ||
-      !templateLanguage ||
-      !parameters
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'Required WhatsApp details are missing'
-      });
-    }
-
-    // ================= MART2META CONFIG =================
-    const YOURUID = process.env.M2M_UID;
-    const API_ACCESS_TOKEN = process.env.M2M_TOKEN;
-    const PHONE_NUMBER_ID = process.env.M2M_PHONE_NUMBER_ID;
-
-    if (!YOURUID || !API_ACCESS_TOKEN || !PHONE_NUMBER_ID) {
-      return res.status(500).json({
-        success: false,
-        message: 'WhatsApp gateway config missing in .env'
-      });
-    }
-
-    const whatsappUrl =
-      `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
-
-    // ---------------------------------------
-    // CLEAN MOBILE NUMBER (India: 91 add karo)
-    // ---------------------------------------
-    let phoneNumber = mobile
-      .toString()
-      .replace(/\D/g, '')
-      .replace(/^0+/, '');
-
-    if (phoneNumber.length === 10) {
-      phoneNumber = '91' + phoneNumber;
-    }
-
-    if (phoneNumber.length < 11 || phoneNumber.length > 15) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid mobile number',
-        mobile: phoneNumber
-      });
-    }
-
-    // ---------------------------------------
-    // PARAMETERS -> ARRAY (+ CLEANUP)
-    // WhatsApp template params me newline/tab/
-    // multiple spaces allowed nahi hote
-    // ---------------------------------------
-    const cleanValue = (value) =>
-      (value ?? '')
-        .toString()
-        .replace(/[\n\r\t]+/g, ' ')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-
-    let parameterList = [];
-
-    if (Array.isArray(parameters)) {
-      parameterList = parameters.map(cleanValue);
-    } else {
-      parameterList = parameters
-        .toString()
-        .split(',')
-        .map(cleanValue);
-    }
-
-    console.log('WHATSAPP PARAMETERS:', parameterList);
-
-    // Template rate_to_customer = 4 parameters
-    if (parameterList.length !== 4 || parameterList.some(p => !p)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Exactly 4 non-empty WhatsApp template parameters are required',
-        parameters: parameterList
-      });
-    }
-
-    // ---------------------------------------
-    // MART2META REQUEST
-    // ---------------------------------------
-    const requestBody = {
-      from_phone_number_id: PHONE_NUMBER_ID,
-      phone_number: phoneNumber,
-      template_name: templateName,
-      template_language: templateLanguage,
-      template_media_type: 'simple',
-      parameters: parameterList
-    };
-
-    console.log('MART2META URL:', whatsappUrl);
-    console.log('MART2META REQUEST:', JSON.stringify(requestBody, null, 2));
-
-    const whatsappResponse = await fetch(whatsappUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_ACCESS_TOKEN}`
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    const whatsappText = await whatsappResponse.text();
-
-    console.log('MART2META STATUS:', whatsappResponse.status);
-    console.log('MART2META RESPONSE:', whatsappText);
-
-    let gatewayData = null;
-    try {
-      gatewayData = JSON.parse(whatsappText);
-    } catch (parseError) {
-      gatewayData = null;
-    }
-
-    // ---------------------------------------
-    // ERROR CHECK
-    // ---------------------------------------
-    const gatewayFailed =
-      !whatsappResponse.ok ||
-      gatewayData?.error ||
-      gatewayData?.success === false ||
-      gatewayData?.status === 'error';
-
-    if (gatewayFailed) {
-      console.error('MART2META WHATSAPP ERROR:', gatewayData || whatsappText);
-
-      return res.status(502).json({
-        success: false,
-        message:
-          gatewayData?.error?.message ||
-          gatewayData?.message ||
-          'WhatsApp gateway failed',
-        gatewayStatus: whatsappResponse.status,
-        gatewayResponse: gatewayData || whatsappText
-      });
-    }
-
-    // ---------------------------------------
-    // SUCCESS
-    // ---------------------------------------
-    return res.json({
-      success: true,
-      message: 'Rate sent on WhatsApp successfully',
-      gatewayResponse: gatewayData || whatsappText
-    });
-
-  } catch (err) {
-    console.error('SEND RATE WHATSAPP ERROR:', err);
-
-    return res.status(500).json({
-      success: false,
-      message: err.message
-    });
-  }
 });
 
 router.post('/enquiry-customer-products', async (req, res) => {
