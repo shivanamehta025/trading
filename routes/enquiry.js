@@ -805,18 +805,14 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       databaseName,
       notificationId,
       mobile,
-      message,
       templateName,
       templateLanguage,
       parameters
     } = req.body;
-
-    // notificationId is optional because EnquiryScreen automatic
-    // WhatsApp send does not have a notification ID.
+ 
     if (
       !databaseName ||
       !mobile ||
-      !message ||
       !templateName ||
       !templateLanguage ||
       !parameters
@@ -826,30 +822,31 @@ router.post('/send-rate-whatsapp', async (req, res) => {
         message: 'Required WhatsApp details are missing'
       });
     }
-
+ 
     const YOURUID = process.env.M2M_UID;
     const API_ACCESS_TOKEN = process.env.M2M_TOKEN;
     const PHONE_NUMBER_ID = process.env.M2M_PHONE_NUMBER_ID;
-
+ 
     if (!YOURUID || !API_ACCESS_TOKEN || !PHONE_NUMBER_ID) {
       return res.status(500).json({
         success: false,
         message: 'WhatsApp gateway config missing in .env'
       });
     }
-
+ 
     const whatsappUrl =
       `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
-
+ 
+    // ---------- MOBILE (India: 91 add) ----------
     let phoneNumber = mobile
       .toString()
       .replace(/\D/g, '')
       .replace(/^0+/, '');
-
+ 
     if (phoneNumber.length === 10) {
       phoneNumber = '91' + phoneNumber;
     }
-
+ 
     if (phoneNumber.length < 11 || phoneNumber.length > 15) {
       return res.status(400).json({
         success: false,
@@ -857,16 +854,21 @@ router.post('/send-rate-whatsapp', async (req, res) => {
         mobile: phoneNumber
       });
     }
-
+ 
+    // ---------- PARAMETERS ----------
+    // Comma aur { } hata dete hain, kyunki Mart2Meta inhi se
+    // parameters alag karta hai. Newline/extra spaces bhi WhatsApp
+    // allow nahi karta.
     const cleanValue = (value) =>
       (value ?? '')
         .toString()
         .replace(/[\n\r\t]+/g, ' ')
+        .replace(/[,{}]/g, ' ')
         .replace(/\s{2,}/g, ' ')
         .trim();
-
+ 
     let parameterList = [];
-
+ 
     if (Array.isArray(parameters)) {
       parameterList = parameters.map(cleanValue);
     } else {
@@ -875,42 +877,31 @@ router.post('/send-rate-whatsapp', async (req, res) => {
         .split(',')
         .map(cleanValue);
     }
-
+ 
     console.log('WHATSAPP PARAMETERS:', parameterList);
-
-    // ============================================================
-    // TEMPLATE HAS EXACTLY 3 PARAMETERS
-    //
-    // {{1}} = Customer Name
-    // {{2}} = Product + Rate List
-    // {{3}} = Advance
-    // ============================================================
-
-    if (parameterList.length !== 3 || parameterList.some(p => !p)) {
+ 
+    // Template rate_to_customer_no_header = exactly 4 variables
+    if (parameterList.length !== 4 || parameterList.some(p => !p)) {
       return res.status(400).json({
         success: false,
-        message:
-          'Exactly 3 non-empty WhatsApp template parameters are required',
+        message: 'Exactly 4 non-empty WhatsApp template parameters are required',
         parameters: parameterList
       });
     }
-
+ 
+    // Mart2Meta format: {value1},{value2},{value3},{value4}
     const requestBody = {
       from_phone_number_id: PHONE_NUMBER_ID,
       phone_number: phoneNumber,
       template_name: templateName,
       template_language: templateLanguage,
       template_media_type: 'simple',
-      parameters: parameterList
+      parameters: parameterList.map(p => `{${p}}`).join(',')
     };
-
+ 
     console.log('MART2META URL:', whatsappUrl);
-
-    console.log(
-      'MART2META REQUEST:',
-      JSON.stringify(requestBody, null, 2)
-    );
-
+    console.log('MART2META REQUEST:', JSON.stringify(requestBody, null, 2));
+ 
     const whatsappResponse = await fetch(whatsappUrl, {
       method: 'POST',
       headers: {
@@ -919,39 +910,30 @@ router.post('/send-rate-whatsapp', async (req, res) => {
       },
       body: JSON.stringify(requestBody)
     });
-
+ 
     const whatsappText = await whatsappResponse.text();
-
-    console.log(
-      'MART2META STATUS:',
-      whatsappResponse.status
-    );
-
-    console.log(
-      'MART2META RESPONSE:',
-      whatsappText
-    );
-
+ 
+    console.log('MART2META STATUS:', whatsappResponse.status);
+    console.log('MART2META RESPONSE:', whatsappText);
+ 
     let gatewayData = null;
-
+ 
     try {
       gatewayData = JSON.parse(whatsappText);
     } catch (parseError) {
       gatewayData = null;
     }
-
+ 
+    // Is API me STATUS 200 ke saath bhi "error" aa sakta hai
     const gatewayFailed =
       !whatsappResponse.ok ||
       gatewayData?.error ||
       gatewayData?.success === false ||
       gatewayData?.status === 'error';
-
+ 
     if (gatewayFailed) {
-      console.error(
-        'MART2META WHATSAPP ERROR:',
-        gatewayData || whatsappText
-      );
-
+      console.error('MART2META WHATSAPP ERROR:', gatewayData || whatsappText);
+ 
       return res.status(502).json({
         success: false,
         message:
@@ -962,19 +944,16 @@ router.post('/send-rate-whatsapp', async (req, res) => {
         gatewayResponse: gatewayData || whatsappText
       });
     }
-
+ 
     return res.json({
       success: true,
       message: 'Rate sent on WhatsApp successfully',
       gatewayResponse: gatewayData || whatsappText
     });
-
+ 
   } catch (err) {
-    console.error(
-      'SEND RATE WHATSAPP ERROR:',
-      err
-    );
-
+    console.error('SEND RATE WHATSAPP ERROR:', err);
+ 
     return res.status(500).json({
       success: false,
       message: err.message
