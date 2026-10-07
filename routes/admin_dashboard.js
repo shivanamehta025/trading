@@ -1014,7 +1014,11 @@ router.post('/purchase-analysis', async (req, res) => {
 
 router.post("/today-sales-profit", async (req, res) => {
   try {
-    const { databaseName } = req.body;
+    const {
+      databaseName,
+      fromDate,
+      toDate,
+    } = req.body;
 
     if (!databaseName) {
       return res.status(400).json({
@@ -1022,16 +1026,40 @@ router.post("/today-sales-profit", async (req, res) => {
       });
     }
 
+    if (!fromDate || !toDate) {
+      return res.status(400).json({
+        error: "fromDate and toDate are required",
+      });
+    }
+
     const pool = await getPool(databaseName);
 
     const result = await pool
       .request()
-      .input("WHAT", sql.VarChar, "TODAY_SALES_PROFIT")
+      .input(
+        "WHAT",
+        sql.VarChar,
+        "TODAY_SALES_PROFIT"
+      )
+      .input(
+        "FROMDATE",
+        sql.Date,
+        fromDate
+      )
+      .input(
+        "TODATE",
+        sql.Date,
+        toDate
+      )
       .execute("A_SP_FOR_DASHBOARD_ADMIN");
 
     return res.json(result.recordsets);
+
   } catch (error) {
-    console.error("TODAY SALES PROFIT ERROR:", error);
+    console.error(
+      "TODAY SALES PROFIT ERROR:",
+      error
+    );
 
     return res.status(500).json({
       error: error.message,
