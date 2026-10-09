@@ -773,7 +773,8 @@ router.post('/rate-whatsapp-data', async (req, res) => {
       .input('unq', sql.NVarChar(50), referenceId)
       .execute('A_SP_FOR_ENQUIRYMASTER_APP');
 
-    const row = result.recordset?.[0];
+    const rows = result.recordset || [];
+    const row = rows[0];
 
     if (!row) {
       return res.json({
@@ -782,10 +783,21 @@ router.post('/rate-whatsapp-data', async (req, res) => {
       });
     }
 
+    const products = rows
+      .map((r) => {
+        const rate = parseFloat(r.CASHAMT);
+        return {
+          product: r.PRODUCT?.toString().trim() ?? '',
+          cashRate: Number.isFinite(rate) ? String(rate) : '0',
+        };
+      })
+      .filter((p) => p.product && parseFloat(p.cashRate) > 0);
+
     return res.json({
       success: true,
       customerName: row.CUSTNAME?.toString() ?? '',
       mobile: row.MOBILE?.toString() ?? '',
+      products,
     });
 
   } catch (err) {
