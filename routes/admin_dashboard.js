@@ -166,6 +166,8 @@ router.post("/sales-analysis", async (req, res) => {
       period,
       fromDate,
       toDate,
+      branchId = null,
+     salespersonId = null,
        topProductsOffset = 0,
        topProductsLimit = 5,
 
@@ -265,10 +267,22 @@ router.post("/sales-analysis", async (req, res) => {
     )
 
     .input(
+  "BRANCHID",
+  sql.UniqueIdentifier,
+  branchId || null
+)
+.input(
+  "SALESPERSONID",
+  sql.UniqueIdentifier,
+  salespersonId || null
+)
+
+    .input(
       "LIMIT",
       sql.Int,
       Number(limit) || 5
     );
+
 
   const result =
     await request.execute(
@@ -439,6 +453,8 @@ router.post("/sales-analysis/paged", async (req, res) => {
       period,
       fromDate,
       toDate,
+      branchId = null,
+      salespersonId = null,
       what,
       offset = 0,
       limit = 5
@@ -562,6 +578,16 @@ router.post("/sales-analysis/paged", async (req, res) => {
         sql.Int,
         safeOffset
       )
+      .input(
+  "BRANCHID",
+  sql.UniqueIdentifier,
+  branchId || null
+)
+.input(
+  "SALESPERSONID",
+  sql.UniqueIdentifier,
+  salespersonId || null
+)
 
       .input(
         "LIMIT",
@@ -634,6 +660,58 @@ router.post("/sales-analysis/paged", async (req, res) => {
 
   }
 
+});
+
+// Branch dropdown options for Sales Analysis
+router.post("/sales-analysis-branches", async (req, res) => {
+  try {
+    const { databaseName } = req.body;
+    if (!databaseName) {
+      return res.status(400).json({ success: false, message: "databaseName is required" });
+    }
+
+    const pool = await getPool(databaseName);
+    const result = await pool.request().query(`
+      SELECT DISTINCT
+        SM1002.SM1002_5 AS BRANCHID,
+        SM1002.SM1002_7 AS BRANCH
+      FROM SM1002
+      WHERE SM1002.SM1002_5 IS NOT NULL
+        AND LTRIM(RTRIM(ISNULL(SM1002.SM1002_7, ''))) <> ''
+      ORDER BY SM1002.SM1002_7;
+    `);
+
+    return res.json({ success: true, data: result.recordset || [] });
+  } catch (error) {
+    console.error("/sales-analysis-branches error:", error);
+    return res.status(500).json({ success: false, message: "Unable to load branches" });
+  }
+});
+
+// Salesperson dropdown options for Sales Analysis
+router.post("/sales-analysis-salespersons", async (req, res) => {
+  try {
+    const { databaseName } = req.body;
+    if (!databaseName) {
+      return res.status(400).json({ success: false, message: "databaseName is required" });
+    }
+
+    const pool = await getPool(databaseName);
+    const result = await pool.request().query(`
+      SELECT DISTINCT
+        SM502.UNQID AS SALESPERSONID,
+        SM502.SM502_4 AS SALESPERSON
+      FROM SM502
+      WHERE SM502.UNQID IS NOT NULL
+        AND LTRIM(RTRIM(ISNULL(SM502.SM502_4, ''))) <> ''
+      ORDER BY SM502.SM502_4;
+    `);
+
+    return res.json({ success: true, data: result.recordset || [] });
+  } catch (error) {
+    console.error("/sales-analysis-salespersons error:", error);
+    return res.status(500).json({ success: false, message: "Unable to load salespersons" });
+  }
 });
 
 // ============================================================
@@ -1066,6 +1144,8 @@ router.post("/today-sales-profit", async (req, res) => {
     });
   }
 });
+
+
 
 router.post("/director-outstanding", async (req, res) => {
   try {
