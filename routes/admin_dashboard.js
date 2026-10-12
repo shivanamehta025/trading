@@ -1061,6 +1061,14 @@ router.post('/purchase-analysis', async (req, res) => {
       )
       .execute('A_SP_FOR_PURCHASE_ANALYSIS');
 
+      console.log(
+  result.recordsets.map((rs, index) => ({
+    index,
+    rows: rs.length,
+    columns: rs.length ? Object.keys(rs[0]) : [],
+  }))
+);
+
     res.json(result.recordsets);
 
   } catch (error) {
