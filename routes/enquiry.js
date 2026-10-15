@@ -353,6 +353,7 @@ router.post('/get-notify-targets', async (req, res) => {
         const result = await pool.request()
             .input('what', sql.NVarChar(50), 'gettargetusers')
             .input('keytype', sql.NVarChar(100), keytype)
+            .input('manufacture', sql.NVarChar(50), manufacturerId)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
 
         res.json({
