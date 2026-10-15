@@ -11,7 +11,7 @@ router.post('/enquiry-bind-dropdown', async (req, res) => {
     try {
 
         const {
-            databaseName
+            databaseName, branch, userid
         } = req.body;
 
         const pool = await getPool(databaseName);
@@ -20,6 +20,8 @@ router.post('/enquiry-bind-dropdown', async (req, res) => {
 
             .input('what', sql.NVarChar(50), 'binddropdown')
 
+            .input("branch", sql.NVarChar, branch)
+            .input("userid", sql.NVarChar, userid)
             .execute('A_SP_FOR_ENQUIRYMASTER_APP');
 
         res.json({
