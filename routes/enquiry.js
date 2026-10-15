@@ -347,7 +347,7 @@ router.post('/enquiry-rem-stock', async (req, res) => {
 
 router.post('/get-notify-targets', async (req, res) => {
     try {
-        const { databaseName, keytype } = req.body;
+        const { databaseName, keytype, manufacturerId } = req.body;
         const pool = await getPool(databaseName);
 
         const result = await pool.request()
