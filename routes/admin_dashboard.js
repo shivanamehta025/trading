@@ -1011,69 +1011,32 @@ router.post("/director-product-branch-detail", async (req, res) => {
 
 router.post('/purchase-analysis', async (req, res) => {
   try {
-    const {
-      databaseName,
-      productId,
-      period,
-      dashboardDate,
-      supplierId
-    } = req.body;
+    const { databaseName, productId, supplierId, period, dashboardDate, fromDate, toDate } = req.body;
 
     if (!databaseName) {
-      return res.status(400).json({
-        error: 'databaseName is required'
-      });
+      return res.status(400).json({ error: 'databaseName is required' });
     }
-
     if (!productId) {
-      return res.status(400).json({
-        error: 'productId is required'
-      });
+      return res.status(400).json({ error: 'productId is required' });
+    }
+    if ((period || '').toUpperCase() === 'CUSTOM' && (!fromDate || !toDate)) {
+      return res.status(400).json({ error: 'fromDate and toDate are required for CUSTOM period' });
     }
 
     const pool = await getPool(databaseName);
+    const request = pool.request()
+      .input('WHAT', sql.NVarChar(50), 'PRODUCT_PURCHASE_ANALYSIS')
+      .input('PERIOD', sql.NVarChar(20), period || 'MONTH')
+      .input('PRODUCTID', sql.UniqueIdentifier, productId)
+      .input('DashboardDate', sql.Date, dashboardDate || new Date())
+      .input('SUPPLIERID', sql.UniqueIdentifier, supplierId || null)
+      .input('FromDate', sql.Date, fromDate || null)
+      .input('ToDate', sql.Date, toDate || null);
 
-    const result = await pool.request()
-      .input(
-        'WHAT',
-        sql.NVarChar(50),
-        'PRODUCT_PURCHASE_ANALYSIS'
-      )
-      .input(
-        'PERIOD',
-        sql.NVarChar(20),
-        period || 'MONTH'
-      )
-      .input(
-        'PRODUCTID',
-        sql.UniqueIdentifier,
-        productId
-      )
-      .input(
-        'DashboardDate',
-        sql.Date,
-        dashboardDate || new Date()
-      )
-      .input(
-        'SUPPLIERID',
-        sql.UniqueIdentifier,
-        supplierId || null
-      )
-      .execute('A_SP_FOR_PURCHASE_ANALYSIS');
-
-      console.log(
-  result.recordsets.map((rs, index) => ({
-    index,
-    rows: rs.length,
-    columns: rs.length ? Object.keys(rs[0]) : [],
-  }))
-);
-
+    const result = await request.execute('A_SP_FOR_PURCHASE_ANALYSIS');
     res.json(result.recordsets);
-
   } catch (error) {
     console.error('Purchase analysis error:', error);
-
     res.status(500).json({
       error: 'Failed to load purchase analysis',
       details: error.message
