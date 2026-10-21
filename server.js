@@ -7703,6 +7703,9 @@ app.use("/api", freightenq);
 const price_enq = require("./routes/price_enq");
 app.use("/api", price_enq);
 
+const transfersales = require("./routes/transfersales");
+app.use("/api", transfersales);
+
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
