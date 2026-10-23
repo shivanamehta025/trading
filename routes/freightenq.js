@@ -6,50 +6,46 @@ const { getPool } = require("../config/db");
 
 router.post('/freight-enquiry-masters', async (req, res) => {
     try {
+        const { databaseName, userId } = req.body;
 
-        const {
-            databaseName,
-            userId
-        } = req.body;
+        if (!databaseName) {
+            return res.status(400).json({
+                success: false,
+                message: 'databaseName is required'
+            });
+        }
 
         const pool = await getPool(databaseName);
 
-        const result = await pool.request()
-            .input(
-                'WHAT',
-                sql.NVarChar,
-                'GET_MASTERS'
-            )
-            .input(
-                'TRANSPORTERUNQID',
-                sql.NVarChar,
-                null
-            )
+        // Get cities, customers, products, transporters, etc.
+        const mastersResult = await pool.request()
+            .input('WHAT', sql.NVarChar, 'GET_MASTERS')
+            .input('TRANSPORTERUNQID', sql.NVarChar, null)
             .execute('A_SP_FOR_FREIGHT_ENQUIRY');
+
+        // Get PO card records from the separate SQL condition.
+        const poCardsResult = await pool.request()
+            .input('WHAT', sql.NVarChar, 'GET_PO_CARDS')
+            .input('TRANSPORTERUNQID', sql.NVarChar, null)
+            .execute('A_SP_FOR_FREIGHT_ENQUIRY');
+
+        const masterSets = mastersResult.recordsets || [];
 
         res.json({
             success: true,
 
-            // 1
-            cities: result.recordsets[0] || [],
+            cities: masterSets[0] || [],
+            customers: masterSets[1] || [],
+            products: masterSets[2] || [],
+            transporters: masterSets[3] || [],
 
-            // 2
-            customers: result.recordsets[1] || [],
+            // Use the dedicated PO-card query.
+            purchaseOrders: poCardsResult.recordset || [],
 
-            // 3
-            products: result.recordsets[2] || [],
-
-            // 4
-            transporters: result.recordsets[3] || [],
-
-            // 5 - PO TABLE
-            purchaseOrders: result.recordsets[4] || [],
-
-            vehicleTypes: result.recordsets[5] || [],
+            vehicleTypes: masterSets[5] || []
         });
 
     } catch (error) {
-
         console.error(
             'FREIGHT ENQUIRY MASTERS ERROR:',
             error
@@ -57,7 +53,7 @@ router.post('/freight-enquiry-masters', async (req, res) => {
 
         res.status(500).json({
             success: false,
-            message: error.message,
+            message: error.message
         });
     }
 });
