@@ -874,107 +874,122 @@ router.post('/get-freight-enquiry-list', async (req, res) => {
 });
 
 
+
 router.post("/save-allocation", async (req, res) => {
-    try {
-        const {
-            databaseName,
-            poUnqid,
-            scheduleDate,
-            allocationQty,
-            allocationDateTime,
-            createdBy
-        } = req.body;
+  try {
+    const {
+      databaseName,
+      poUnqid,
+      allocationQty,
+      allocationDateTime,
+      createdBy,
+      freightUnqid,
+    } = req.body;
 
-        if (!databaseName || !poUnqid) {
-            return res.status(400).json({
-                success: false,
-                message: "Database and purchase order are required."
-            });
-        }
-
-        const qty = Number(allocationQty);
-
-        if (!Number.isFinite(qty) || qty <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Allocation quantity must be greater than zero."
-            });
-        }
-
-        const allocationDate = new Date(allocationDateTime);
-
-        if (!allocationDateTime || isNaN(allocationDate.getTime())) {
-            return res.status(400).json({
-                success: false,
-                message: "Valid allocation date and time are required."
-            });
-        }
-
-        const pool = await getPool(databaseName);
-
-        const request = pool.request();
-
-       
-request.input(
-    "POUNQID",
-    sql.UniqueIdentifier,
-    poUnqid
-);
-
-request.input(
-    "ALLOCATIONDATE",
-    sql.Date,
-    scheduleDate
-);
-
-request.input(
-    "ALLOCATIONQTY",
-    sql.Numeric(18, 3),
-    qty
-);
-
-request.input(
-    "CREATEDBY",
-    sql.NVarChar(100),
-    createdBy || null
-);
-
-request.input(
-    "FREIGHTUNQID",
-    sql.UniqueIdentifier,
-    null
-);
-
-const result = await request.execute(
-    "A_SP_SAVE_FREIGHT_ALLOCATION"
-);
-
-        const saved = result.recordset?.[0];
-
-        if (!saved || saved.SUCCESS !== true && saved.SUCCESS !== 1) {
-            return res.status(500).json({
-                success: false,
-                message: saved?.MESSAGE || "Allocation could not be saved."
-            });
-        }
-
-        return res.json({
-            success: true,
-            message: saved.MESSAGE,
-            allocation: saved
-        });
-
-    } catch (error) {
-        console.error("Save allocation error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message:
-                error.originalError?.info?.message ||
-                error.message ||
-                "Failed to save allocation."
-        });
+    if (!databaseName || !poUnqid || !allocationDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Database, PO and allocation date are required.",
+      });
     }
+
+    const qty = Number(allocationQty);
+
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Allocation quantity must be greater than zero.",
+      });
+    }
+
+    // Expect an ISO date/time string, e.g. 2026-10-28T00:00:00.000
+    // Do not parse it using new Date(), which can introduce timezone shifts.
+    const match = String(allocationDateTime).match(
+      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/
+    );
+
+    if (!match) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid allocation date/time format.",
+      });
+    }
+
+    const [, year, month, day, hour, minute, second] = match;
+    const date = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second)
+    );
+
+    if (
+      date.getFullYear() !== Number(year) ||
+      date.getMonth() + 1 !== Number(month) ||
+      date.getDate() !== Number(day)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid allocation date.",
+      });
+    }
+
+    const sqlDateTime =
+      `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+
+    const pool = await getPool(databaseName);
+
+    const request = pool.request();
+
+    request.input("POUNQID", sql.UniqueIdentifier, poUnqid);
+
+    // Send ISO text; SQL Server converts it to DATETIME2 without
+    // applying a timezone conversion.
+    request.input(
+      "ALLOCATIONDATETIME",
+      sql.NVarChar(30),
+      sqlDateTime
+    );
+
+    request.input(
+      "ALLOCATIONQTY",
+      sql.Numeric(18, 3),
+      qty
+    );
+
+    request.input(
+      "CREATEDBY",
+      sql.NVarChar(100),
+      createdBy || null
+    );
+
+    request.input(
+      "FREIGHTUNQID",
+      sql.UniqueIdentifier,
+      freightUnqid || null
+    );
+
+    const result = await request.execute(
+      "A_SP_SAVE_FREIGHT_ALLOCATION"
+    );
+
+    const saved = result.recordset?.[0];
+
+    return res.status(200).json({
+      success: true,
+      message: saved?.MESSAGE || "Allocation saved successfully.",
+      data: saved || null,
+    });
+  } catch (error) {
+    console.error("SAVE ALLOCATION ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to save allocation.",
+    });
+  }
 });
 
 
