@@ -914,36 +914,40 @@ router.post("/save-allocation", async (req, res) => {
 
         const request = pool.request();
 
-        request.input("POUNQID", sql.UniqueIdentifier, poUnqid);
-        request.input(
-            "SCHEDULEDATE",
-            sql.Date,
-            scheduleDate || null
-        );
-        request.input(
-            "ALLOCATIONQTY",
-            sql.Numeric(18, 3),
-            qty
-        );
-        request.input(
-            "ALLOCATIONDATETIME",
-            sql.DateTime2(0),
-            allocationDate
-        );
-        request.input(
-            "CREATEDBY",
-            sql.NVarChar(100),
-            createdBy || null
-        );
-        request.input(
-            "FREIGHTUNQID",
-            sql.UniqueIdentifier,
-            null
-        );
+       
+request.input(
+    "POUNQID",
+    sql.UniqueIdentifier,
+    poUnqid
+);
 
-        const result = await request.execute(
-            "A_SP_SAVE_FREIGHT_ALLOCATION"
-        );
+request.input(
+    "ALLOCATIONDATE",
+    sql.Date,
+    scheduleDate
+);
+
+request.input(
+    "ALLOCATIONQTY",
+    sql.Numeric(18, 3),
+    qty
+);
+
+request.input(
+    "CREATEDBY",
+    sql.NVarChar(100),
+    createdBy || null
+);
+
+request.input(
+    "FREIGHTUNQID",
+    sql.UniqueIdentifier,
+    null
+);
+
+const result = await request.execute(
+    "A_SP_SAVE_FREIGHT_ALLOCATION"
+);
 
         const saved = result.recordset?.[0];
 
