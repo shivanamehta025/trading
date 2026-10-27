@@ -1107,6 +1107,40 @@ router.post("/save-allocation-request", async (req, res) => {
 });
 
 
+router.post("/get-allocation-requests", async (req, res) => {
+  try {
+    const { databaseName } = req.body;
+
+    if (!databaseName) {
+      return res.status(400).json({
+        success: false,
+        message: "Database name is required.",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request().execute(
+      "A_SP_GET_FREIGHT_ALLOCATION_REQUESTS"
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result.recordset || [],
+    });
+  } catch (error) {
+    console.error("GET ALLOCATION REQUESTS ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message || "Failed to load allocation requests.",
+    });
+  }
+});
+
+
+
 
 
 module.exports = router;
