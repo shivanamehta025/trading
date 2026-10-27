@@ -1140,6 +1140,73 @@ router.post("/get-allocation-requests", async (req, res) => {
 });
 
 
+router.post("/cancel-allocation-request", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      requestUnqid,
+      actionBy,
+      cancellationReason,
+    } = req.body;
+
+    if (!databaseName || !requestUnqid) {
+      return res.status(400).json({
+        success: false,
+        message: "Database and request ID are required.",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+    const request = pool.request();
+
+    request.input(
+      "REQUESTUNQID",
+      sql.UniqueIdentifier,
+      requestUnqid
+    );
+
+    request.input(
+      "ACTIONBY",
+      sql.NVarChar(100),
+      actionBy || null
+    );
+
+    request.input(
+      "CANCELLATIONREASON",
+      sql.NVarChar(500),
+      cancellationReason || null
+    );
+
+    const result = await request.execute(
+      "A_SP_CANCEL_FREIGHT_ALLOCATION_REQUEST"
+    );
+
+    const saved = result.recordset?.[0];
+
+    return res.status(200).json({
+      success: saved?.SUCCESS === true || saved?.SUCCESS === 1,
+      message:
+        saved?.MESSAGE ||
+        "Allocation request cancelled successfully.",
+    });
+  } catch (error) {
+    console.error("CANCEL ALLOCATION REQUEST ERROR:", error);
+
+    const message =
+      error.message || "Failed to cancel allocation request.";
+
+    const isValidationError =
+      /not found or is no longer pending/i.test(message);
+
+    return res.status(isValidationError ? 409 : 500).json({
+      success: false,
+      message,
+    });
+  }
+});
+
+
+
 
 
 
