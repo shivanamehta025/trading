@@ -874,7 +874,6 @@ router.post('/get-freight-enquiry-list', async (req, res) => {
 });
 
 
-
 router.post("/save-allocation", async (req, res) => {
   try {
     const {
@@ -991,6 +990,122 @@ router.post("/save-allocation", async (req, res) => {
     });
   }
 });
+
+
+
+router.post("/save-allocation-request", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      poUnqid,
+      requestedQty,
+      requestedDateTime,
+      createdBy,
+    } = req.body;
+
+    if (!databaseName || !poUnqid || !requestedDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Database, PO and requested date are required.",
+      });
+    }
+
+    const qty = Number(requestedQty);
+
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Requested quantity must be greater than zero.",
+      });
+    }
+
+    // Expect yyyy-MM-dd, e.g. 2026-10-28.
+    // Do not use new Date() for SQL date conversion.
+    const match = String(requestedDateTime).match(
+      /^(\d{4})-(\d{2})-(\d{2})$/
+    );
+
+    if (!match) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid requested date format. Use yyyy-MM-dd.",
+      });
+    }
+
+    const [, year, month, day] = match;
+
+    const date = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day)
+    );
+
+    if (
+      date.getFullYear() !== Number(year) ||
+      date.getMonth() + 1 !== Number(month) ||
+      date.getDate() !== Number(day)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid requested date.",
+      });
+    }
+
+    const sqlDate = `${year}-${month}-${day}`;
+
+    const pool = await getPool(databaseName);
+    const request = pool.request();
+
+    request.input(
+      "POUNQID",
+      sql.UniqueIdentifier,
+      poUnqid
+    );
+
+    // Pass date text directly to SQL Server.
+    request.input(
+      "REQUESTEDDATE",
+      sql.NVarChar(10),
+      sqlDate
+    );
+
+    request.input(
+      "REQUESTEDQTY",
+      sql.Numeric(18, 3),
+      qty
+    );
+
+    request.input(
+      "REQUESTEDBY",
+      sql.NVarChar(100),
+      createdBy || null
+    );
+
+    const result = await request.execute(
+      "A_SP_SAVE_FREIGHT_ALLOCATION_REQUEST"
+    );
+
+    const saved = result.recordset?.[0];
+
+    return res.status(200).json({
+      success: true,
+      message:
+        saved?.MESSAGE ||
+        "Allocation request submitted successfully.",
+      data: saved || null,
+    });
+  } catch (error) {
+    console.error("SAVE ALLOCATION REQUEST ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to save allocation request.",
+    });
+  }
+});
+
 
 
 
