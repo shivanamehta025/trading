@@ -883,6 +883,7 @@ router.post("/save-allocation", async (req, res) => {
       allocationDateTime,
       createdBy,
       freightUnqid,
+      requestUnqid,
     } = req.body;
 
     if (!databaseName || !poUnqid || !allocationDateTime) {
@@ -901,8 +902,8 @@ router.post("/save-allocation", async (req, res) => {
       });
     }
 
-    // Expect an ISO date/time string, e.g. 2026-10-28T00:00:00.000
-    // Do not parse it using new Date(), which can introduce timezone shifts.
+    // Accept local ISO date/time without timezone conversion.
+    // Example: 2026-10-28T00:00:00.000
     const match = String(allocationDateTime).match(
       /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/
     );
@@ -910,11 +911,13 @@ router.post("/save-allocation", async (req, res) => {
     if (!match) {
       return res.status(400).json({
         success: false,
-        message: "Invalid allocation date/time format.",
+        message:
+          "Invalid allocation date/time format. Expected YYYY-MM-DDTHH:mm:ss.",
       });
     }
 
     const [, year, month, day, hour, minute, second] = match;
+
     const date = new Date(
       Number(year),
       Number(month) - 1,
@@ -927,11 +930,14 @@ router.post("/save-allocation", async (req, res) => {
     if (
       date.getFullYear() !== Number(year) ||
       date.getMonth() + 1 !== Number(month) ||
-      date.getDate() !== Number(day)
+      date.getDate() !== Number(day) ||
+      date.getHours() !== Number(hour) ||
+      date.getMinutes() !== Number(minute) ||
+      date.getSeconds() !== Number(second)
     ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid allocation date.",
+        message: "Invalid allocation date/time.",
       });
     }
 
@@ -939,17 +945,12 @@ router.post("/save-allocation", async (req, res) => {
       `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 
     const pool = await getPool(databaseName);
-
     const request = pool.request();
 
-    request.input("POUNQID", sql.UniqueIdentifier, poUnqid);
-
-    // Send ISO text; SQL Server converts it to DATETIME2 without
-    // applying a timezone conversion.
     request.input(
-      "ALLOCATIONDATETIME",
-      sql.NVarChar(30),
-      sqlDateTime
+      "POUNQID",
+      sql.UniqueIdentifier,
+      poUnqid
     );
 
     request.input(
@@ -970,23 +971,49 @@ router.post("/save-allocation", async (req, res) => {
       freightUnqid || null
     );
 
+    // Send date/time as text so SQL Server converts it to DATETIME2
+    // without applying a timezone conversion.
+    request.input(
+      "ALLOCATIONDATETIME",
+      sql.NVarChar(30),
+      sqlDateTime
+    );
+
+    request.input(
+      "REQUESTUNQID",
+      sql.UniqueIdentifier,
+      requestUnqid || null
+    );
+
     const result = await request.execute(
       "A_SP_SAVE_FREIGHT_ALLOCATION"
     );
 
     const saved = result.recordset?.[0];
 
+    if (!saved || saved.SUCCESS !== true && saved.SUCCESS !== 1) {
+      return res.status(500).json({
+        success: false,
+        message: saved?.MESSAGE || "Allocation could not be saved.",
+        data: saved || null,
+      });
+    }
+
     return res.status(200).json({
       success: true,
-      message: saved?.MESSAGE || "Allocation saved successfully.",
-      data: saved || null,
+      message:
+        saved.MESSAGE || "Allocation saved successfully.",
+      data: saved,
     });
   } catch (error) {
     console.error("SAVE ALLOCATION ERROR:", error);
 
     return res.status(500).json({
       success: false,
-      message: error.message || "Failed to save allocation.",
+      message:
+        error.originalError?.info?.message ||
+        error.message ||
+        "Failed to save allocation.",
     });
   }
 });
