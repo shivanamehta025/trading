@@ -930,10 +930,7 @@ router.post("/save-allocation", async (req, res) => {
     if (
       date.getFullYear() !== Number(year) ||
       date.getMonth() + 1 !== Number(month) ||
-      date.getDate() !== Number(day) ||
-      date.getHours() !== Number(hour) ||
-      date.getMinutes() !== Number(minute) ||
-      date.getSeconds() !== Number(second)
+      date.getDate() !== Number(day) 
     ) {
       return res.status(400).json({
         success: false,
