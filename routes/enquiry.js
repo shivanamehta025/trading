@@ -1106,4 +1106,26 @@ router.post('/enquiry-customer-products', async (req, res) => {
     }
 });
 
+router.post('/enquiry-show-previous', async (req, res) => {
+    try {
+        const { databaseName, custname, unq } = req.body;
+        const pool = await getPool(databaseName);
+
+        const result = await pool.request()
+            .input('what', sql.NVarChar(50), 'showprevious')
+            .input('CUSTNAME', sql.NVarChar(50), custname)
+            .input('unq', sql.NVarChar(50), unq || '')
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({
+            success: true,
+            data: result.recordsets[0] || [],
+            customerName: result.recordsets[1]?.[0]?.custname ?? ''
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 module.exports = router;
