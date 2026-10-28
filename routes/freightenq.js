@@ -874,6 +874,7 @@ router.post('/get-freight-enquiry-list', async (req, res) => {
 });
 
 
+
 router.post("/save-allocation", async (req, res) => {
   try {
     const {
@@ -902,53 +903,64 @@ router.post("/save-allocation", async (req, res) => {
       });
     }
 
-    // Accept local ISO date/time without timezone conversion.
-    // Example: 2026-10-28T00:00:00.000
-    const match = String(allocationDateTime).match(
-      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/
+    // Accept either YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.
+    // No timezone conversion is performed.
+    const dateInput = String(allocationDateTime).trim();
+
+    const match = dateInput.match(
+      /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?)?$/
     );
 
     if (!match) {
       return res.status(400).json({
         success: false,
         message:
-          "Invalid allocation date/time format. Expected YYYY-MM-DDTHH:mm:ss.",
+          "Invalid allocation date. Expected YYYY-MM-DD.",
       });
     }
 
-    const [, year, month, day, hour, minute, second] = match;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
 
-    const date = new Date(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour),
-      Number(minute),
-      Number(second)
-    );
+    // Date-only input defaults to midnight.
+    const hour = Number(match[4] ?? 0);
+    const minute = Number(match[5] ?? 0);
+    const second = Number(match[6] ?? 0);
+
+    // Validate the calendar date without local timezone conversion.
+    const checkDate = new Date(Date.UTC(year, month - 1, day));
 
     if (
-      date.getFullYear() !== Number(year) ||
-      date.getMonth() + 1 !== Number(month) ||
-      date.getDate() !== Number(day) 
+      checkDate.getUTCFullYear() !== year ||
+      checkDate.getUTCMonth() + 1 !== month ||
+      checkDate.getUTCDate() !== day ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59 ||
+      second < 0 ||
+      second > 59
     ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid allocation date/time.",
+        message: "Invalid allocation date or time.",
       });
     }
 
+    // SQL DATETIME2 input string. A date-only value becomes midnight.
     const sqlDateTime =
-      `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+      `${String(year).padStart(4, "0")}-` +
+      `${String(month).padStart(2, "0")}-` +
+      `${String(day).padStart(2, "0")}T` +
+      `${String(hour).padStart(2, "0")}:` +
+      `${String(minute).padStart(2, "0")}:` +
+      `${String(second).padStart(2, "0")}`;
 
     const pool = await getPool(databaseName);
     const request = pool.request();
 
-    request.input(
-      "POUNQID",
-      sql.UniqueIdentifier,
-      poUnqid
-    );
+    request.input("POUNQID", sql.UniqueIdentifier, poUnqid);
 
     request.input(
       "ALLOCATIONQTY",
@@ -968,8 +980,6 @@ router.post("/save-allocation", async (req, res) => {
       freightUnqid || null
     );
 
-    // Send date/time as text so SQL Server converts it to DATETIME2
-    // without applying a timezone conversion.
     request.input(
       "ALLOCATIONDATETIME",
       sql.NVarChar(30),
@@ -988,7 +998,10 @@ router.post("/save-allocation", async (req, res) => {
 
     const saved = result.recordset?.[0];
 
-    if (!saved || saved.SUCCESS !== true && saved.SUCCESS !== 1) {
+    if (
+      !saved ||
+      (saved.SUCCESS !== true && saved.SUCCESS !== 1)
+    ) {
       return res.status(500).json({
         success: false,
         message: saved?.MESSAGE || "Allocation could not be saved.",
@@ -998,8 +1011,7 @@ router.post("/save-allocation", async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message:
-        saved.MESSAGE || "Allocation saved successfully.",
+      message: saved.MESSAGE || "Allocation saved successfully.",
       data: saved,
     });
   } catch (error) {
@@ -1014,6 +1026,7 @@ router.post("/save-allocation", async (req, res) => {
     });
   }
 });
+
 
 
 
