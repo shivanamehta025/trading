@@ -1243,6 +1243,106 @@ router.post("/cancel-allocation-request", async (req, res) => {
 });
 
 
+router.post("/cancel-allocation", async (req, res) => {
+  try {
+    const {
+      databaseName,
+      allocationUnqid,
+      cancelledBy,
+      cancellationReason,
+    } = req.body;
+
+    if (!databaseName || !allocationUnqid) {
+      return res.status(400).json({
+        success: false,
+        message: "Database and allocation ID are required.",
+      });
+    }
+
+    const reason = String(cancellationReason || "").trim();
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: "Cancellation reason is required.",
+      });
+    }
+
+    if (reason.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: "Cancellation reason cannot exceed 500 characters.",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+    const request = pool.request();
+
+    request.input(
+      "ALLOCATIONUNQID",
+      sql.UniqueIdentifier,
+      allocationUnqid
+    );
+
+    request.input(
+      "CANCELLEDBY",
+      sql.NVarChar(100),
+      cancelledBy || null
+    );
+
+    request.input(
+      "CANCELLATIONREASON",
+      sql.NVarChar(500),
+      reason
+    );
+
+    const result = await request.execute(
+      "A_SP_CANCEL_FREIGHT_ALLOCATION"
+    );
+
+    const saved = result.recordset?.[0];
+
+    if (
+      !saved ||
+      (saved.SUCCESS !== true && saved.SUCCESS !== 1)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: saved?.MESSAGE ||
+          "Allocation could not be cancelled.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: saved.MESSAGE ||
+        "Allocation cancelled successfully.",
+      data: saved,
+    });
+  } catch (error) {
+    console.error("CANCEL ALLOCATION ERROR:", error);
+
+    const message =
+      error.originalError?.info?.message ||
+      error.message ||
+      "Failed to cancel allocation.";
+
+    const isValidationError =
+      /not found|only active allocations|reason is required|status changed|linked request could not be cancelled/i.test(
+        message
+      );
+
+    return res.status(isValidationError ? 409 : 500).json({
+      success: false,
+      message,
+    });
+  }
+});
+
+
+
+
+
 
 
 
