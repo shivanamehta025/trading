@@ -874,7 +874,6 @@ router.post('/get-freight-enquiry-list', async (req, res) => {
 });
 
 
-
 router.post("/save-allocation", async (req, res) => {
   try {
     const {
@@ -883,14 +882,21 @@ router.post("/save-allocation", async (req, res) => {
       allocationQty,
       allocationDateTime,
       createdBy,
-      freightUnqid,
       requestUnqid,
+      cityUnqid,
     } = req.body;
 
-    if (!databaseName || !poUnqid || !allocationDateTime) {
+    if (
+      !databaseName ||
+      !poUnqid ||
+      !allocationDateTime ||
+      !createdBy ||
+      !cityUnqid
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Database, PO and allocation date are required.",
+        message:
+          "Database, PO, allocation date, user and city are required.",
       });
     }
 
@@ -903,94 +909,27 @@ router.post("/save-allocation", async (req, res) => {
       });
     }
 
-    // Accept either YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.
-    // No timezone conversion is performed.
-    const dateInput = String(allocationDateTime).trim();
-
-    const match = dateInput.match(
-      /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?)?$/
-    );
-
-    if (!match) {
+    // Keep the date as YYYY-MM-DD; do not convert it with new Date().
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(allocationDateTime)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid allocation date. Expected YYYY-MM-DD.",
+        message: "Allocation date must be in YYYY-MM-DD format.",
       });
     }
-
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    const day = Number(match[3]);
-
-    // Date-only input defaults to midnight.
-    const hour = Number(match[4] ?? 0);
-    const minute = Number(match[5] ?? 0);
-    const second = Number(match[6] ?? 0);
-
-    // Validate the calendar date without local timezone conversion.
-    const checkDate = new Date(Date.UTC(year, month - 1, day));
-
-    if (
-      checkDate.getUTCFullYear() !== year ||
-      checkDate.getUTCMonth() + 1 !== month ||
-      checkDate.getUTCDate() !== day ||
-      hour < 0 ||
-      hour > 23 ||
-      minute < 0 ||
-      minute > 59 ||
-      second < 0 ||
-      second > 59
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid allocation date or time.",
-      });
-    }
-
-    // SQL DATETIME2 input string. A date-only value becomes midnight.
-    const sqlDateTime =
-      `${String(year).padStart(4, "0")}-` +
-      `${String(month).padStart(2, "0")}-` +
-      `${String(day).padStart(2, "0")}T` +
-      `${String(hour).padStart(2, "0")}:` +
-      `${String(minute).padStart(2, "0")}:` +
-      `${String(second).padStart(2, "0")}`;
 
     const pool = await getPool(databaseName);
     const request = pool.request();
 
     request.input("POUNQID", sql.UniqueIdentifier, poUnqid);
-
-    request.input(
-      "ALLOCATIONQTY",
-      sql.Numeric(18, 3),
-      qty
-    );
-
-    request.input(
-      "CREATEDBY",
-      sql.NVarChar(100),
-      createdBy || null
-    );
-
-    request.input(
-      "FREIGHTUNQID",
-      sql.UniqueIdentifier,
-      freightUnqid || null
-    );
-
-    request.input(
-      "ALLOCATIONDATETIME",
-      sql.NVarChar(30),
-      sqlDateTime
-    );
-
+    request.input("ALLOCATIONQTY", sql.Decimal(18, 3), qty);
+    request.input("ALLOCATIONDATETIME", sql.Date, allocationDateTime);
+    request.input("CREATEDBY", sql.NVarChar(100), createdBy);
     request.input(
       "REQUESTUNQID",
       sql.UniqueIdentifier,
       requestUnqid || null
     );
+    request.input("CITYUNQID", sql.UniqueIdentifier, cityUnqid);
 
     const result = await request.execute(
       "A_SP_SAVE_FREIGHT_ALLOCATION"
@@ -998,35 +937,22 @@ router.post("/save-allocation", async (req, res) => {
 
     const saved = result.recordset?.[0];
 
-    if (
-      !saved ||
-      (saved.SUCCESS !== true && saved.SUCCESS !== 1)
-    ) {
-      return res.status(500).json({
-        success: false,
-        message: saved?.MESSAGE || "Allocation could not be saved.",
-        data: saved || null,
-      });
-    }
-
     return res.status(200).json({
-      success: true,
-      message: saved.MESSAGE || "Allocation saved successfully.",
-      data: saved,
+      success: saved?.SUCCESS === false || saved?.SUCCESS === 0
+        ? false
+        : true,
+      message:
+        saved?.MESSAGE || "Allocation saved successfully.",
     });
   } catch (error) {
-    console.error("SAVE ALLOCATION ERROR:", error);
+    console.error("SAVE FREIGHT ALLOCATION ERROR:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        error.originalError?.info?.message ||
-        error.message ||
-        "Failed to save allocation.",
+      message: error.message || "Failed to save allocation.",
     });
   }
 });
-
 
 
 
@@ -1335,6 +1261,84 @@ router.post("/cancel-allocation", async (req, res) => {
     return res.status(isValidationError ? 409 : 500).json({
       success: false,
       message,
+    });
+  }
+});
+
+router.post("/allocation-cities", async (req, res) => {
+  try {
+    const { databaseName, supplierUnqid } = req.body;
+
+    if (!databaseName || !supplierUnqid) {
+      return res.status(400).json({
+        success: false,
+        message: "Database and supplier ID are required.",
+      });
+    }
+
+    const pool = await getPool(databaseName);
+    const request = pool.request();
+
+    request.input(
+      "SUPPLIERUNQID",
+      sql.UniqueIdentifier,
+      supplierUnqid
+    );
+
+    const result = await request.query(`
+      SET NOCOUNT ON;
+
+      DECLARE @SUPPLIERNAME NVARCHAR(200);
+
+      SELECT @SUPPLIERNAME = SM19_5
+      FROM dbo.SM19
+      WHERE UNQID = @SUPPLIERUNQID;
+
+      IF @SUPPLIERNAME IS NULL
+      BEGIN
+        THROW 50101, 'Supplier not found.', 1;
+      END;
+
+      -- GACL supplier: allow Baroda and Dahej.
+      IF UPPER(@SUPPLIERNAME) LIKE '%GACL%'
+      BEGIN
+        SELECT
+          UNQID,
+          SM1_5 AS CITYNAME
+        FROM dbo.SM01
+        WHERE UNQID IN (
+          'ACB728C2-C41D-4531-B3D0-AB292A2214BF',
+          'A34EA6D7-2983-4562-9E18-CD936EFB48A1'
+        )
+        ORDER BY SM1_5;
+      END
+      ELSE
+      BEGIN
+        -- Other suppliers: use their mapped city.
+        SELECT
+          C.UNQID,
+          C.SM1_5 AS CITYNAME
+        FROM dbo.SM01 C
+        INNER JOIN dbo.SM19 S
+          ON S.SM19_15 = C.UNQID
+        WHERE S.UNQID = @SUPPLIERUNQID
+        ORDER BY C.SM1_5;
+      END;
+    `);
+
+    const cities = result.recordset || [];
+
+    return res.json({
+      success: true,
+      cities,
+      autoSelectCity: cities.length === 1,
+    });
+  } catch (error) {
+    console.error("ALLOCATION CITIES ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Unable to load supplier cities.",
     });
   }
 });
