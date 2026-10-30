@@ -956,6 +956,7 @@ router.post("/save-allocation", async (req, res) => {
 
 
 
+
 router.post("/save-allocation-request", async (req, res) => {
   try {
     const {
@@ -965,6 +966,10 @@ router.post("/save-allocation-request", async (req, res) => {
       requestedDateTime,
       createdBy,
     } = req.body;
+
+    // =====================================
+    // VALIDATE REQUEST
+    // =====================================
 
     if (!databaseName || !poUnqid || !requestedDateTime) {
       return res.status(400).json({
@@ -982,8 +987,7 @@ router.post("/save-allocation-request", async (req, res) => {
       });
     }
 
-    // Expect yyyy-MM-dd, e.g. 2026-10-28.
-    // Do not use new Date() for SQL date conversion.
+    // Validate yyyy-MM-dd without changing the SQL date.
     const match = String(requestedDateTime).match(
       /^(\d{4})-(\d{2})-(\d{2})$/
     );
@@ -1017,38 +1021,224 @@ router.post("/save-allocation-request", async (req, res) => {
     const sqlDate = `${year}-${month}-${day}`;
 
     const pool = await getPool(databaseName);
-    const request = pool.request();
 
-    request.input(
+    // =====================================
+    // SAVE ALLOCATION REQUEST
+    // =====================================
+
+    const saveRequest = pool.request();
+
+    saveRequest.input(
       "POUNQID",
       sql.UniqueIdentifier,
       poUnqid
     );
 
-    // Pass date text directly to SQL Server.
-    request.input(
+    saveRequest.input(
       "REQUESTEDDATE",
       sql.NVarChar(10),
       sqlDate
     );
 
-    request.input(
+    saveRequest.input(
       "REQUESTEDQTY",
       sql.Numeric(18, 3),
       qty
     );
 
-    request.input(
+    saveRequest.input(
       "REQUESTEDBY",
       sql.NVarChar(100),
       createdBy || null
     );
 
-    const result = await request.execute(
+    const result = await saveRequest.execute(
       "A_SP_SAVE_FREIGHT_ALLOCATION_REQUEST"
     );
 
     const saved = result.recordset?.[0];
+
+    // =====================================
+    // GET PO NUMBER
+    // =====================================
+
+    let poNo = poUnqid;
+
+    try {
+      const poResult = await pool
+        .request()
+        .input("POUNQID", sql.UniqueIdentifier, poUnqid)
+        .query(`
+          SELECT SM1028_13 AS PONO
+          FROM SM1028
+          WHERE UNQID = @POUNQID
+        `);
+
+      if (poResult.recordset?.length) {
+        poNo = poResult.recordset[0].PONO || poUnqid;
+      }
+    } catch (error) {
+      console.error(
+        "GET PO NUMBER FOR NOTIFICATION ERROR:",
+        error
+      );
+    }
+
+    // =====================================
+    // GET USERS FROM SM504
+    // SM504_8 MAY CONTAIN MULTIPLE USER IDS
+    // =====================================
+
+    const recipientResult = await pool.request().query(`
+      SELECT SM504_8 AS USERIDS
+      FROM SM504
+      WHERE LTRIM(RTRIM(SM504_4)) = 'Allocation Request'
+        AND NULLIF(LTRIM(RTRIM(SM504_8)), '') IS NOT NULL
+    `);
+
+    const targetUserIds = [
+      ...new Set(
+        (recipientResult.recordset || [])
+          .flatMap((row) =>
+            String(row.USERIDS || "")
+              // Supports comma, semicolon, whitespace,
+              // and line-break-separated IDs.
+              .split(/[,;\\s]+/)
+              .map((id) => id.trim())
+              .filter(Boolean)
+          )
+          .map((id) => id.toUpperCase())
+      ),
+    ];
+
+    console.log(
+      "Allocation Request notification recipients:",
+      targetUserIds
+    );
+
+    const title = "New Allocation Request";
+
+    const message =
+      `New allocation request for PO No. ${poNo}. ` +
+      `Requested quantity: ${qty}. ` +
+      `Requested date: ${sqlDate}.`;
+
+    // =====================================
+    // SAVE NOTIFICATION FOR EACH USER
+    // =====================================
+
+    for (const targetUserId of targetUserIds) {
+      try {
+        await pool
+          .request()
+          .input("USERID", sql.VarChar, targetUserId)
+          .input("TITLE", sql.VarChar, title)
+          .input("MESSAGE", sql.NVarChar, message)
+          .input(
+            "REFERENCEID",
+            sql.VarChar,
+            saved?.UNQID ||
+              saved?.REQUESTUNQID ||
+              poUnqid
+          )
+          .input("DATABASENAME", sql.VarChar, databaseName)
+          .query(`
+            INSERT INTO APP_NOTIFICATION
+            (
+              USERID,
+              TITLE,
+              MESSAGE,
+              REFERENCEID,
+              DATABASENAME
+            )
+            VALUES
+            (
+              @USERID,
+              @TITLE,
+              @MESSAGE,
+              @REFERENCEID,
+              @DATABASENAME
+            )
+          `);
+
+        console.log(
+          "Allocation notification saved for:",
+          targetUserId
+        );
+      } catch (notificationError) {
+        console.error(
+          `Failed to save notification for ${targetUserId}:`,
+          notificationError
+        );
+      }
+    }
+
+    // =====================================
+    // SEND FCM PUSH TO EACH USER
+    // =====================================
+
+    try {
+      if (targetUserIds.length > 0) {
+        const companyPool = await getPool();
+
+        for (const targetUserId of targetUserIds) {
+          try {
+            const tokenResult = await companyPool
+              .request()
+              .input("USERID", sql.VarChar, targetUserId)
+              .query(`
+                SELECT DISTINCT DEVICETOKEN
+                FROM APP_DEVICE_TOKEN
+                WHERE UPPER(LTRIM(RTRIM(USERID))) = @USERID
+                  AND DEVICETOKEN IS NOT NULL
+                  AND LTRIM(RTRIM(DEVICETOKEN)) <> ''
+              `);
+
+            const tokens = [
+              ...new Set(
+                (tokenResult.recordset || [])
+                  .map((row) => row.DEVICETOKEN)
+                  .filter(Boolean)
+              ),
+            ];
+
+            for (const token of tokens) {
+              try {
+                await sendNotification(
+                  token,
+                  title,
+                  message
+                );
+              } catch (pushError) {
+                console.error(
+                  `FCM failed for ${targetUserId}:`,
+                  pushError
+                );
+              }
+            }
+
+            console.log(
+              `FCM processing completed for ${targetUserId}. ` +
+              `Tokens found: ${tokens.length}`
+            );
+          } catch (userPushError) {
+            console.error(
+              `Unable to process push for ${targetUserId}:`,
+              userPushError
+            );
+          }
+        }
+      }
+    } catch (pushError) {
+      console.error(
+        "ALLOCATION PUSH NOTIFICATION ERROR:",
+        pushError
+      );
+    }
+
+    // =====================================
+    // RESPONSE
+    // =====================================
 
     return res.status(200).json({
       success: true,
@@ -1056,6 +1246,7 @@ router.post("/save-allocation-request", async (req, res) => {
         saved?.MESSAGE ||
         "Allocation request submitted successfully.",
       data: saved || null,
+      notificationsSentTo: targetUserIds,
     });
   } catch (error) {
     console.error("SAVE ALLOCATION REQUEST ERROR:", error);
@@ -1068,6 +1259,7 @@ router.post("/save-allocation-request", async (req, res) => {
     });
   }
 });
+
 
 
 router.post("/get-allocation-requests", async (req, res) => {
