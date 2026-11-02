@@ -1158,12 +1158,12 @@ router.post('/enquiry-salesman-mobile', async (req, res) => {
   try {
     const { databaseName, userId } = req.body;
 
-    if (!databaseName || !userId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Database name and user ID are required'
-      });
-    }
+    // if (!databaseName || !userId) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: 'Database name and user ID are required'
+    //   });
+    // }
 
     const pool = await getPool(databaseName);
 
