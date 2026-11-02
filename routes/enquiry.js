@@ -896,10 +896,10 @@ router.post('/send-rate-whatsapp', async (req, res) => {
     console.log('WHATSAPP PARAMETERS:', parameterList);
  
     // Template rate_to_customer_no_header = exactly 4 variables
-    if (parameterList.length !== 4 || parameterList.some(p => !p)) {
+    if (parameterList.length !== 8 || parameterList.some(p => !p)) {
       return res.status(400).json({
         success: false,
-        message: 'Exactly 4 non-empty WhatsApp template parameters are required',
+        message: 'Exactly 8 non-empty WhatsApp template parameters are required',
         parameters: parameterList
       });
     }
@@ -1154,4 +1154,36 @@ router.post('/enquiry-save-whatsapp-mobile', async (req, res) => {
     }
 });
 
+router.post('/enquiry-salesman-mobile', async (req, res) => {
+  try {
+    const { databaseName, userId } = req.body;
+
+    if (!databaseName || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Database name and user ID are required'
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input('WHAT', sql.VarChar, 'salesmmobno')
+      .input('userid', sql.VarChar, userId)
+      .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+    return res.json({
+      success: true,
+      data: result.recordset || []
+    });
+
+  } catch (err) {
+    console.error('SALESMAN MOBILE ERROR:', err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
 module.exports = router;
