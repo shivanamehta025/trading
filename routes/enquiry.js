@@ -1128,4 +1128,30 @@ router.post('/enquiry-show-previous', async (req, res) => {
     }
 });
 
+router.post('/enquiry-save-whatsapp-mobile', async (req, res) => {
+    try {
+        const { databaseName, e_6, mobno } = req.body;
+
+        if (!databaseName || !e_6 || !mobno || !mobno.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Database name, customer and mobile number are required'
+            });
+        }
+
+        const pool = await getPool(databaseName);
+
+        await pool.request()
+            .input('what', sql.NVarChar(50), 'savemobno')
+            .input('e_6', sql.NVarChar(50), e_6)
+            .input('mobno', sql.NVarChar(50), mobno.trim())
+            .execute('A_SP_FOR_ENQUIRYMASTER_APP');
+
+        res.json({ success: true, message: 'WhatsApp mobile number saved successfully' });
+    } catch (err) {
+        console.error('WhatsApp Mobile Save Error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 module.exports = router;
