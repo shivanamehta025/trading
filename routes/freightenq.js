@@ -962,6 +962,7 @@ router.post("/save-allocation-request", async (req, res) => {
     const {
       databaseName,
       poUnqid,
+      poChildUnqid,
       requestedQty,
       requestedDateTime,
       createdBy,
@@ -971,7 +972,7 @@ router.post("/save-allocation-request", async (req, res) => {
     // VALIDATE REQUEST
     // =====================================
 
-    if (!databaseName || !poUnqid || !requestedDateTime) {
+    if (!databaseName || !poUnqid || !poChildUnqid || !requestedDateTime) {
       return res.status(400).json({
         success: false,
         message: "Database, PO and requested date are required.",
@@ -1033,6 +1034,12 @@ router.post("/save-allocation-request", async (req, res) => {
       sql.UniqueIdentifier,
       poUnqid
     );
+
+    saveRequest.input(
+  "POCHILDUNQID",
+  sql.UniqueIdentifier,
+  poChildUnqid
+);
 
     saveRequest.input(
       "REQUESTEDDATE",
