@@ -1487,42 +1487,42 @@ router.post("/allocation-cities", async (req, res) => {
     const result = await request.query(`
       SET NOCOUNT ON;
 
-      DECLARE @SUPPLIERNAME NVARCHAR(200);
+DECLARE @SUPPLIERNAME NVARCHAR(200);
 
-      SELECT @SUPPLIERNAME = SM19_5
-      FROM dbo.SM19
-      WHERE UNQID = @SUPPLIERUNQID;
+SELECT @SUPPLIERNAME = SM19_5
+FROM dbo.SM19
+WHERE UNQID = @SUPPLIERUNQID;
 
-      IF @SUPPLIERNAME IS NULL
-      BEGIN
-        THROW 50101, 'Supplier not found.', 1;
-      END;
+IF @SUPPLIERNAME IS NULL
+BEGIN
+    THROW 50101, 'Supplier not found.', 1;
+END;
 
-      -- GACL supplier: allow Baroda and Dahej.
-      IF UPPER(@SUPPLIERNAME) LIKE '%GACL%'
-      BEGIN
-        SELECT
-          UNQID,
-          SM1_5 AS CITYNAME
-        FROM dbo.SM01
-        WHERE UNQID IN (
-          'ACB728C2-C41D-4531-B3D0-AB292A2214BF',
-          'A34EA6D7-2983-4562-9E18-CD936EFB48A1'
-        )
-        ORDER BY SM1_5;
-      END
-      ELSE
-      BEGIN
-        -- Other suppliers: use their mapped city.
-        SELECT
-          C.UNQID,
-          C.SM1_5 AS CITYNAME
-        FROM dbo.SM01 C
-        INNER JOIN dbo.SM19 S
-          ON S.SM19_15 = C.UNQID
-        WHERE S.UNQID = @SUPPLIERUNQID
-        ORDER BY C.SM1_5;
-      END;
+-- GACL: show Baroda and Dahej.
+IF UPPER(LTRIM(RTRIM(@SUPPLIERNAME))) LIKE '%GACL%'
+BEGIN
+    SELECT
+        UNQID AS UNQID,
+        SM1_5 AS CITYNAME
+    FROM dbo.SM01
+    WHERE UNQID IN (
+        'ACB728C2-C41D-4531-B3D0-AB29A2214BF4',
+        'A34EA6D7-2983-4562-9E18-CD936EFB4A81'
+    )
+    ORDER BY SM1_5;
+END
+ELSE
+BEGIN
+    -- Other suppliers: show their mapped city.
+    SELECT
+        C.UNQID AS UNQID,
+        C.SM1_5 AS CITYNAME
+    FROM dbo.SM01 AS C
+    INNER JOIN dbo.SM19 AS S
+        ON S.SM19_15 = C.UNQID
+    WHERE S.UNQID = @SUPPLIERUNQID
+    ORDER BY C.SM1_5;
+END;
     `);
 
     const cities = result.recordset || [];
