@@ -57,6 +57,7 @@ router.post('/freight-enquiry-masters', async (req, res) => {
         });
     }
 });
+
 router.post('/freight-enquiry-vehicles', async (req, res) => {
     try {
 
@@ -954,9 +955,6 @@ router.post("/save-allocation", async (req, res) => {
   }
 });
 
-
-
-
 router.post("/save-allocation-request", async (req, res) => {
   try {
     const {
@@ -1267,8 +1265,6 @@ router.post("/save-allocation-request", async (req, res) => {
   }
 });
 
-
-
 router.post("/get-allocation-requests", async (req, res) => {
   try {
     const { databaseName } = req.body;
@@ -1543,11 +1539,209 @@ END;
 });
 
 
+router.post('/update-transporter-mobile', async (req, res) => {
+  try {
+    const { databaseName, transporterUnqid, mobile } = req.body;
+
+    if (!databaseName || !transporterUnqid || !mobile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Database, transporter and mobile number are required',
+      });
+    }
+
+    const digits = String(mobile).replace(/\D/g, '');
+
+    if (!/^[6-9]\d{9}$/.test(digits)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter a valid 10-digit Indian mobile number',
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input('UNQID', sql.NVarChar, transporterUnqid)
+      .input('MOBILE', sql.NVarChar, digits)
+      .query(`
+        UPDATE SM19
+        SET SM19_20 = @MOBILE
+        WHERE UNQID = @UNQID
+          AND SM19_11 = 'trans';
+
+        SELECT @@ROWCOUNT AS UPDATEDROWS;
+      `);
+
+    const updatedRows =
+      result.recordset?.[0]?.UPDATEDROWS ?? 0;
+
+    if (updatedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transporter not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Transporter mobile number saved successfully',
+      mobile: digits,
+    });
+  } catch (error) {
+    console.error('UPDATE TRANSPORTER MOBILE ERROR:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to save transporter mobile number',
+    });
+  }
+});
 
 
+router.post('/send-freight-whatsapp', async (req, res) => {
+  try {
+    const {
+      databaseName,
+      notificationId,
+      mobile,
+      parameters
+    } = req.body;
 
+    if (!databaseName || !mobile || !Array.isArray(parameters)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Database, mobile and parameter array are required'
+      });
+    }
 
+    const YOURUID = process.env.M2M_UID;
+    const API_ACCESS_TOKEN = process.env.M2M_TOKEN;
+    const PHONE_NUMBER_ID = process.env.M2M_PHONE_NUMBER_ID;
 
+    if (!YOURUID || !API_ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+      return res.status(500).json({
+        success: false,
+        message: 'WhatsApp gateway config missing in .env'
+      });
+    }
 
+    // Normalize mobile number.
+    let phoneNumber = String(mobile)
+      .replace(/\D/g, '')
+      .replace(/^0+/, '');
+
+    if (phoneNumber.length === 10) {
+      phoneNumber = '91' + phoneNumber;
+    }
+
+    if (phoneNumber.length < 11 || phoneNumber.length > 15) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid mobile number',
+        mobile: phoneNumber
+      });
+    }
+
+    // Clean template parameters.
+    const cleanValue = (value) =>
+      String(value ?? '')
+        .replace(/[\n\r\t]+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    const parameterList = parameters.map(cleanValue);
+
+    // freight_inquiry requires exactly 10 variables.
+    if (
+      parameterList.length !== 10 ||
+      parameterList.some((p) => !p)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Exactly 10 non-empty freight template parameters are required',
+        parameters: parameterList
+      });
+    }
+
+    const whatsappUrl =
+      `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
+
+    const requestBody = {
+      from_phone_number_id: PHONE_NUMBER_ID,
+      phone_number: phoneNumber,
+      template_name: 'freight_inquiry',
+      template_language: 'en',
+      template_media_type: 'simple',
+      parameters: parameterList
+        .map((p) => `{${p.replace(/[,{}]/g, ' ')}}`)
+        .join(',')
+    };
+
+    console.log('FREIGHT WHATSAPP ENQUIRY:', notificationId);
+    console.log('FREIGHT WHATSAPP MOBILE:', phoneNumber);
+    console.log(
+      'FREIGHT WHATSAPP REQUEST:',
+      JSON.stringify(requestBody, null, 2)
+    );
+
+    const whatsappResponse = await fetch(whatsappUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const whatsappText = await whatsappResponse.text();
+
+    console.log('FREIGHT WHATSAPP STATUS:', whatsappResponse.status);
+    console.log('FREIGHT WHATSAPP RESPONSE:', whatsappText);
+
+    let gatewayData;
+
+    try {
+      gatewayData = JSON.parse(whatsappText);
+    } catch {
+      gatewayData = null;
+    }
+
+    const gatewayFailed =
+      !whatsappResponse.ok ||
+      gatewayData?.error ||
+      gatewayData?.success === false ||
+      gatewayData?.status === 'error';
+
+    if (gatewayFailed) {
+      return res.status(502).json({
+        success: false,
+        message:
+          gatewayData?.error?.message ||
+          gatewayData?.message ||
+          'Freight WhatsApp gateway failed',
+        gatewayStatus: whatsappResponse.status,
+        gatewayResponse: gatewayData || whatsappText
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Freight enquiry WhatsApp request sent successfully',
+      notificationId,
+      mobile: phoneNumber,
+      gatewayResponse: gatewayData || whatsappText
+    });
+
+  } catch (err) {
+    console.error('SEND FREIGHT WHATSAPP ERROR:', err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+});
 
 module.exports = router;
