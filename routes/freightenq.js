@@ -1632,7 +1632,7 @@ router.post('/send-freight-whatsapp', async (req, res) => {
       .replace(/^0+/, '');
 
     if (phoneNumber.length === 10) {
-      phoneNumber = '91' + phoneNumber;
+      phoneNumber =  phoneNumber;
     }
 
     if (phoneNumber.length < 11 || phoneNumber.length > 15) {
