@@ -1627,22 +1627,27 @@ router.post('/send-freight-whatsapp', async (req, res) => {
     }
 
     // Normalize mobile number.
-    let phoneNumber = String(mobile)
-      .replace(/\D/g, '')
-      .replace(/^0+/, '');
+   // Normalize mobile number
+let phoneNumber = String(mobile)
+  .replace(/\D/g, '')
+  .replace(/^0+/, '');
 
-    if (phoneNumber.length === 10) {
-      phoneNumber =  phoneNumber;
-    }
+// If 10 digits, add India's country code
+if (phoneNumber.length === 10) {
+  phoneNumber = '91' + phoneNumber;
+}
 
-    if (phoneNumber.length < 11 || phoneNumber.length > 15) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid mobile number',
-        mobile: phoneNumber
-      });
-    }
-
+// Validate the final number
+if (
+  phoneNumber.length < 11 ||
+  phoneNumber.length > 15
+) {
+  return res.status(400).json({
+    success: false,
+    message: 'Invalid mobile number',
+    mobile: phoneNumber
+  });
+}
     // Clean template parameters.
     const cleanValue = (value) =>
       String(value ?? '')
