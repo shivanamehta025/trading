@@ -1672,7 +1672,7 @@ router.post('/send-freight-whatsapp', async (req, res) => {
       from_phone_number_id: PHONE_NUMBER_ID,
       phone_number: phoneNumber,
       template_name: 'freight_inquiry',
-      template_language: 'en',
+      template_language: 'en_us',
       template_media_type: 'simple',
       parameters: parameterList
         .map((p) => `{${p.replace(/[,{}]/g, ' ')}}`)
