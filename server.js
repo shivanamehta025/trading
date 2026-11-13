@@ -7706,6 +7706,9 @@ app.use("/api", price_enq);
 const transfersales = require("./routes/transfersales");
 app.use("/api", transfersales);
 
+const rate_update = require("./routes/rate_update");
+app.use("/api", rate_update);
+
 // ─────────────────────────────────────────────────────
 // START SERVER
 // ─────────────────────────────────────────────────────
