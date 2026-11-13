@@ -3420,11 +3420,11 @@ app.post("/api/my-groups", async (req, res) => {
   try {
     const { databaseName, userId } = req.body;
 
-    console.log("========== MY GROUPS REQUEST ==========");
+   /*  console.log("========== MY GROUPS REQUEST ==========");
     console.log("databaseName =>", databaseName);
     console.log("userId       =>", userId);
     console.log("=======================================");
-
+ */
     if (!databaseName || !userId) {
       return res.status(400).json({
         success: false,
@@ -3501,10 +3501,10 @@ app.post("/api/my-groups", async (req, res) => {
           G.CREATEDON DESC
       `);
 
-    console.log("========== MY GROUPS API ==========");
+/*     console.log("========== MY GROUPS API ==========");
     console.log("USERID =>", userId);
     console.log("RESULT =>", JSON.stringify(result.recordset, null, 2));
-    console.log("===================================");
+    console.log("==================================="); */
 
     return res.json({
       success: true,
