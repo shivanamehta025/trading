@@ -1754,4 +1754,155 @@ if (
   }
 });
 
+
+// ============================================================
+// SEND WHATSAPP AFTER FREIGHT APPROVAL
+// Template: freight_inquiry_after_approval
+// 7 template variables. Mobile is looked up using SM1032_C.UNQID.
+// ============================================================
+router.post('/send-freight-approval-whatsapp', async (req, res) => {
+  try {
+    const { databaseName, childUnqid, parameters } = req.body;
+
+    if (!databaseName || !childUnqid || !Array.isArray(parameters)) {
+      return res.status(400).json({
+        success: false,
+        message: 'databaseName, childUnqid and parameters are required'
+      });
+    }
+
+    const YOURUID = process.env.M2M_UID;
+    const API_ACCESS_TOKEN = process.env.M2M_TOKEN;
+    const PHONE_NUMBER_ID = process.env.M2M_PHONE_NUMBER_ID;
+
+    if (!YOURUID || !API_ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+      return res.status(500).json({
+        success: false,
+        message: 'WhatsApp gateway config missing in .env'
+      });
+    }
+
+    if (parameters.length !== 7) {
+      return res.status(400).json({
+        success: false,
+        message: 'freight_inquiry_after_approval requires exactly 7 parameters'
+      });
+    }
+
+    const parameterList = parameters.map((value) =>
+      String(value ?? '')
+        .replace(/[\n\r\t]+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+    );
+
+    if (parameterList.some((value) => !value)) {
+      return res.status(400).json({
+        success: false,
+        message: 'All 7 freight approval WhatsApp parameters are required'
+      });
+    }
+
+    // Resolve the mobile from the approved SM1032_C child record.
+    const pool = await getPool(databaseName);
+    const detailResult = await pool.request()
+      .input('CHILDUNQID', sql.UniqueIdentifier, childUnqid)
+      .query(`
+        SELECT TOP (1)
+          C.UNQID AS CHILDUNQID,
+          T.SM19_20 AS MOBILENO
+        FROM dbo.SM1032_C C
+        INNER JOIN dbo.SM19 T
+          ON T.UNQID = C.SM1032_C2
+        WHERE C.UNQID = @CHILDUNQID
+      `);
+
+    const detail = detailResult.recordset?.[0];
+    if (!detail) {
+      return res.status(404).json({
+        success: false,
+        message: 'Approved transporter child record was not found in SM1032_C'
+      });
+    }
+
+    let phoneNumber = String(detail.MOBILENO ?? '')
+      .replace(/\D/g, '')
+      .replace(/^0+/, '');
+
+    if (phoneNumber.length === 10) phoneNumber = '91' + phoneNumber;
+
+    if (phoneNumber.length < 11 || phoneNumber.length > 15) {
+      return res.status(400).json({
+        success: false,
+        message: 'Approved transporter has an invalid or missing mobile number',
+        childUnqid
+      });
+    }
+
+    const whatsappUrl =
+      `https://login.mart2meta.com/api/${YOURUID}/contact/send-template`;
+
+    const requestBody = {
+      from_phone_number_id: PHONE_NUMBER_ID,
+      phone_number: phoneNumber,
+      template_name: 'freight_inquiry_after_approval',
+      template_language: 'en_us',
+      template_media_type: 'simple',
+      parameters: parameterList
+        .map((value) => `{${value.replace(/[,{}]/g, ' ')}}`)
+        .join(',')
+    };
+
+    console.log('FREIGHT APPROVAL WHATSAPP CHILD:', childUnqid);
+    console.log('FREIGHT APPROVAL WHATSAPP MOBILE:', `${phoneNumber.slice(0, 4)}******`);
+
+    const gatewayResponse = await fetch(whatsappUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const gatewayText = await gatewayResponse.text();
+    let gatewayData;
+    try {
+      gatewayData = JSON.parse(gatewayText);
+    } catch (_) {
+      gatewayData = null;
+    }
+
+    const failed = !gatewayResponse.ok ||
+      gatewayData?.error ||
+      gatewayData?.success === false ||
+      gatewayData?.status === 'error' ||
+      gatewayData?.result === 'failed';
+
+    if (failed) {
+      return res.status(502).json({
+        success: false,
+        message: gatewayData?.error?.message || gatewayData?.message ||
+          'Freight approval WhatsApp gateway failed',
+        gatewayStatus: gatewayResponse.status,
+        gatewayResponse: gatewayData || gatewayText
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Freight approval WhatsApp request sent successfully',
+      childUnqid,
+      mobile: phoneNumber,
+      gatewayResponse: gatewayData || gatewayText
+    });
+  } catch (error) {
+    console.error('SEND FREIGHT APPROVAL WHATSAPP ERROR:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
