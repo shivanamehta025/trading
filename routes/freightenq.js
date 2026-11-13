@@ -449,17 +449,22 @@ console.log('==========================================');
                 );
 
 
-        const record =
-            result.recordset?.[0];
+        // First result set: parent enquiry details.
+        const record = result.recordsets?.[0]?.[0] || result.recordset?.[0] || null;
 
+        // Second result set: saved SM1032_C child rows, one per transporter.
+        // Each row contains the child's own UNQID, which is the ID required
+        // by the Interested link (not the transporter master UNQID).
+        const transporterChildRecords = result.recordsets?.[1] || [];
+
+        console.log('SAVED ENQUIRY PARENT UNQID:', record?.UNQID || '');
+        console.log('SAVED TRANSPORTER CHILD COUNT:', transporterChildRecords.length);
 
         res.json({
             success: true,
-
-            message:
-                'Freight enquiry saved successfully',
-
-            data: record || null
+            message: 'Freight enquiry saved successfully',
+            data: record,
+            transporterChildRecords
         });
 
 
