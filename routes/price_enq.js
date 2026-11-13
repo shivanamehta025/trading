@@ -155,11 +155,11 @@ router.post("/price-enquiry", async (req, res) => {
         const enquiryUnq =
             createData.ENQUIRYUNQ;
 
-
+/* 
         console.log(
             "PRICE ENQUIRY CREATED:",
             enquiryUnq
-        );
+        ); */
 
 
         // =====================================================
@@ -379,12 +379,12 @@ router.post("/price-enquiry", async (req, res) => {
                     enquiryUnq
                 });
             }
-
+/* 
 
             console.log(
                 "PRICE ENQUIRY PRODUCT ADDED:",
                 productId
-            );
+            ); */
         }
 
 
@@ -439,10 +439,10 @@ router.post("/price-enquiry", async (req, res) => {
         // SUCCESS
         // =====================================================
 
-        console.log(
+     /*    console.log(
             "PRICE ENQUIRY SUBMITTED:",
             enquiryUnq
-        );
+        ); */
 
 
         return res.status(200).json({
@@ -454,12 +454,12 @@ router.post("/price-enquiry", async (req, res) => {
 
 
     } catch (error) {
-
+/* 
         console.error(
             "PRICE ENQUIRY ERROR:",
             error
         );
-
+ */
 
         return res.status(500).json({
             success: false,
@@ -504,11 +504,11 @@ router.post("/price-enquiry-pending", async (req, res) => {
         });
 
     } catch (error) {
-
+/* 
         console.error(
             "PRICE ENQUIRY PENDING ERROR:",
             error
-        );
+        ); */
 
         return res.status(500).json({
             success: false,
@@ -565,10 +565,10 @@ router.post("/price-enquiry-detail", async (req, res) => {
 
     } catch (error) {
 
-        console.error(
+    /*     console.error(
             "PRICE ENQUIRY DETAIL ERROR:",
             error
-        );
+        ); */
 
         return res.status(500).json({
             success: false,
