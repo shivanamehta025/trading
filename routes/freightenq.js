@@ -245,27 +245,21 @@ router.post('/save-freight-enquiry', async (req, res) => {
         const {
             databaseName,
             userId,
-
             poUnqid,
             pono,
-
             fromCity,
             toCity,
-
             product,
             customer,
-
             quantity,
-
             transporter,
             transporterUnqids,
             vehicle,
             vehicleType,
-
             driverName,
             driverMobile,
-
-            freight
+            freight,
+            loadingDate
         } = req.body;
 
 
@@ -288,6 +282,56 @@ router.post('/save-freight-enquiry', async (req, res) => {
         console.log('DRIVER MOBILE:', driverMobile);
         console.log('FREIGHT:', freight);
         console.log('TRANSPORTER UNQIDS:',transporterUnqids);
+
+        // ===========================================
+// LOADING DATE VALIDATION
+// ===========================================
+
+if (
+    typeof loadingDate !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(loadingDate)
+) {
+    return res.status(400).json({
+        success: false,
+        message: 'Loading date must be in yyyy-MM-dd format'
+    });
+}
+
+// Validate actual calendar date without timezone conversion.
+const [year, month, day] = loadingDate.split('-').map(Number);
+
+const checkDate = new Date(
+    Date.UTC(year, month - 1, day)
+);
+
+if (
+    checkDate.getUTCFullYear() !== year ||
+    checkDate.getUTCMonth() !== month - 1 ||
+    checkDate.getUTCDate() !== day
+) {
+    return res.status(400).json({
+        success: false,
+        message: 'Invalid loading date'
+    });
+}
+
+// Compare dates using local server date.
+const now = new Date();
+
+const todayString = [
+    now.getFullYear().toString().padStart(4, '0'),
+    (now.getMonth() + 1).toString().padStart(2, '0'),
+    now.getDate().toString().padStart(2, '0')
+].join('-');
+
+if (loadingDate < todayString) {
+    return res.status(400).json({
+        success: false,
+        message: 'Loading date cannot be earlier than today'
+    });
+}
+
+console.log('VALIDATED LOADING DATE:', loadingDate);
 
 
         if (!databaseName) {
@@ -341,6 +385,8 @@ console.log('FREIGHT        =', freight);
 console.log('==========================================');
 
 
+
+
         const result =
             await pool.request()
 
@@ -369,6 +415,12 @@ console.log('==========================================');
                     sql.NVarChar(50),
                     pono
                 )
+
+                .input(
+    'LOADINGDATE',
+    sql.Date,
+    loadingDate
+)
 
                 .input(
                     'FROMCITY',
