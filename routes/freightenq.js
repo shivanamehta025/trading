@@ -101,145 +101,90 @@ router.post('/freight-enquiry-vehicles', async (req, res) => {
     }
 });
 
+
 router.post('/freight-enquiry-by-po', async (req, res) => {
+  try {
+    const { databaseName, poUnqid, poChildUnqid } = req.body;
 
-    try {
+    console.log('\n======================================');
+    console.log('FREIGHT PO DETAILS API');
+    console.log('DATABASE:', databaseName);
+    console.log('POUNQID:', poUnqid);
+    console.log('POCHILDUNQID:', poChildUnqid);
+    console.log('======================================');
 
-       const { databaseName, poUnqid, poChildUnqid } = req.body;
-
-        console.log(
-            '======================================'
-        );
-
-        console.log(
-            'FREIGHT PO DETAILS API'
-        );
-
-        console.log(
-            'DATABASE:',
-            databaseName
-        );
-
-        console.log(
-            'POUNQID:',
-            poUnqid
-        );
-
-        console.log(
-            '======================================'
-        );
-
-
-        if (!databaseName) {
-
-            return res.status(400).json({
-                success: false,
-                message: 'databaseName is required'
-            });
-
-        }
-
-
-        if (!poUnqid) {
-
-            return res.status(400).json({
-                success: false,
-                message: 'poUnqid is required'
-            });
-
-        }
-
-
-        const pool =
-            await getPool(databaseName);
-
-
-        const result =
-            await pool.request()
-
-                .input(
-                    'WHAT',
-                    sql.NVarChar(50),
-                    'GET_PO_DETAILS'
-                )
-
-                .input(
-                    'TRANSPORTERUNQID',
-                    sql.NVarChar(100),
-                    null
-                )
-
-                .input(
-                    'POUNQID',
-                    sql.NVarChar(100),
-                    poUnqid
-                )
-
-                 .input(
-                    'POCHILDUNQID',
-                    sql.NVarChar(100),
-                    poChildUnqid
-                )
-
-                .execute(
-                    'A_SP_FOR_FREIGHT_ENQUIRY'
-                );
-
-
-        console.log(
-            'PO RECORDSETS:',
-            result.recordsets
-        );
-
-
-        res.json({
-
-            success: true,
-
-            data:
-                result.recordset &&
-                result.recordset.length > 0
-                    ? result.recordset[0]
-                    : null
-
-        });
-
-    } catch (error) {
-
-        console.error(
-            '======================================'
-        );
-
-        console.error(
-            'FREIGHT PO API ERROR'
-        );
-
-        console.error(
-            error
-        );
-
-        console.error(
-            '======================================'
-        );
-
-
-        res.status(500).json({
-
-            success: false,
-
-            message:
-                error.message,
-
-            error:
-                error.originalError
-                    ?.message ||
-                null
-
-        });
-
+    if (!databaseName || !poUnqid || !poChildUnqid) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'databaseName, poUnqid and poChildUnqid are required',
+      });
     }
 
+    const pool = await getPool(databaseName);
+
+    const result = await pool
+      .request()
+      .input('WHAT', sql.NVarChar(50), 'GET_PO_DETAILS')
+      .input('TRANSPORTERUNQID', sql.NVarChar(100), null)
+      .input('POUNQID', sql.UniqueIdentifier, poUnqid)
+      .input('POCHILDUNQID', sql.UniqueIdentifier, poChildUnqid)
+      .execute('dbo.A_SP_FOR_FREIGHT_ENQUIRY');
+
+    console.log('PO DETAILS RECORDSET:', result.recordset);
+    console.log(
+      'PO DETAILS ALL RECORDSETS:',
+      JSON.stringify(result.recordsets, null, 2)
+    );
+
+    // Find the recordset containing the selected PO details.
+    const recordsets = result.recordsets || [];
+
+    const detailRecordset = recordsets.find(
+      (records) =>
+        Array.isArray(records) &&
+        records.length > 0 &&
+        (
+          Object.prototype.hasOwnProperty.call(records[0], 'FROMCITY') ||
+          Object.prototype.hasOwnProperty.call(records[0], 'TOCITY') ||
+          Object.prototype.hasOwnProperty.call(records[0], 'POCHILDUNQID')
+        )
+    );
+
+    const poDetails = detailRecordset?.[0] ?? null;
+
+    console.log('FINAL PO DETAILS:', poDetails);
+
+    if (!poDetails) {
+      return res.status(404).json({
+        success: false,
+        message: 'No PO details returned by GET_PO_DETAILS.',
+        debug: {
+          poUnqid,
+          poChildUnqid,
+          recordsetCount: recordsets.length,
+          recordsetLengths: recordsets.map(
+            (records) => records.length
+          ),
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: poDetails,
+    });
+  } catch (error) {
+    console.error('FREIGHT PO API ERROR:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+      error: error.originalError?.message || null,
+    });
+  }
 });
+
 
 router.post('/save-freight-enquiry', async (req, res) => {
 
