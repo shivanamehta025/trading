@@ -105,10 +105,7 @@ router.post('/freight-enquiry-by-po', async (req, res) => {
 
     try {
 
-        const {
-            databaseName,
-            poUnqid
-        } = req.body;
+       const { databaseName, poUnqid, poChildUnqid } = req.body;
 
         console.log(
             '======================================'
@@ -176,6 +173,12 @@ router.post('/freight-enquiry-by-po', async (req, res) => {
                     'POUNQID',
                     sql.NVarChar(100),
                     poUnqid
+                )
+
+                 .input(
+                    'POCHILDUNQID',
+                    sql.NVarChar(100),
+                    poChildUnqid
                 )
 
                 .execute(
