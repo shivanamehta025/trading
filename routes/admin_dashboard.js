@@ -1101,42 +1101,57 @@ router.post("/today-sales-profit", async (req, res) => {
 
 
 
+
 router.post("/director-outstanding", async (req, res) => {
   try {
-
-    const { databaseName } = req.body;
+    const { databaseName, what } = req.body;
 
     if (!databaseName) {
       return res.status(400).json({
+        success: false,
         error: "databaseName is required",
       });
     }
+
+    const allowedWhatValues = [
+      "DIRECTOR_OUTSTANDING",
+      "DIRECTOR_TOTALOUTSTANDING",
+    ];
+
+    const selectedWhat = what || "DIRECTOR_OUTSTANDING";
+
+    if (!allowedWhatValues.includes(selectedWhat)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid outstanding type",
+      });
+    }
+
+    console.log("======================================");
+    console.log("DIRECTOR OUTSTANDING API");
+    console.log("DATABASE:", databaseName);
+    console.log("WHAT:", selectedWhat);
+    console.log("======================================");
 
     const pool = await getPool(databaseName);
 
     const result = await pool
       .request()
-      .input(
-        "WHAT",
-        sql.VarChar,
-        "DIRECTOR_OUTSTANDING"
-      )
+      .input("WHAT", sql.VarChar, selectedWhat)
       .execute("A_SP_FOR_DASHBOARD_ADMIN");
 
     return res.json(result.recordsets);
 
   } catch (error) {
-
-    console.error(
-      "DIRECTOR OUTSTANDING ERROR:",
-      error
-    );
+    console.error("DIRECTOR OUTSTANDING ERROR:", error);
 
     return res.status(500).json({
+      success: false,
       error: error.message,
     });
   }
 });
+
 
 router.post("/director-outstanding-poke", async (req, res) => {
   try {
