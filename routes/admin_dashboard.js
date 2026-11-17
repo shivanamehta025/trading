@@ -1364,4 +1364,76 @@ router.post("/director-outstanding-poke", async (req, res) => {
   }
 });
 
+
+router.post('/admin-customer-health-details', async (req, res) => {
+  try {
+    const { databaseName, type } = req.body;
+
+    console.log('====================================');
+    console.log('ADMIN CUSTOMER HEALTH DETAILS');
+    console.log('Database:', databaseName);
+    console.log('Filter:', type);
+    console.log('====================================');
+
+    if (!databaseName || !type) {
+      return res.status(400).json({
+        success: false,
+        message: 'databaseName and type are required',
+      });
+    }
+
+    const allowedTypes = [
+      'NEW',
+      'REPEAT',
+      'KEY',
+      'TOP',
+      'RETENTION',
+      'LOST',
+    ];
+
+    const selectedType = String(type).trim().toUpperCase();
+
+    if (!allowedTypes.includes(selectedType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid customer health filter',
+      });
+    }
+
+    const pool = await getPool(databaseName);
+
+    const result = await pool.request()
+      .input(
+        'WHAT',
+        sql.NVarChar(200),
+        'ADMIN_CUSTOMER_HEALTH_DETAILS'
+      )
+      .input(
+        'TYPE',
+        sql.NVarChar(20),
+        selectedType
+      )
+      .execute('dbo.A_SP_FOR_DASHBOARD_ADMIN');
+
+    console.log(
+      'Admin customers returned:',
+      result.recordset?.length ?? 0
+    );
+
+    return res.status(200).json({
+      success: true,
+      customers: result.recordset ?? [],
+    });
+  } catch (error) {
+    console.error('ADMIN CUSTOMER HEALTH ERROR:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load admin customer health details',
+      error: error.message,
+    });
+  }
+});
+
+
 module.exports = router;
