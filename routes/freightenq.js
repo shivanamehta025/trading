@@ -185,7 +185,12 @@ router.post('/freight-enquiry-by-po', async (req, res) => {
   }
 });
 
-const {
+
+router.post('/save-freight-enquiry', async (req, res) => {
+
+    try {
+
+      const {
     databaseName,
     userId,
     poUnqid,
