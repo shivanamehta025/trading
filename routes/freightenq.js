@@ -185,30 +185,26 @@ router.post('/freight-enquiry-by-po', async (req, res) => {
   }
 });
 
-
-router.post('/save-freight-enquiry', async (req, res) => {
-
-    try {
-
-        const {
-            databaseName,
-            userId,
-            poUnqid,
-            pono,
-            fromCity,
-            toCity,
-            product,
-            customer,
-            quantity,
-            transporter,
-            transporterUnqids,
-            vehicle,
-            vehicleType,
-            driverName,
-            driverMobile,
-            freight,
-            loadingDate
-        } = req.body;
+const {
+    databaseName,
+    userId,
+    poUnqid,
+    poChildUnqid, // NEW: individual schedule's child UNQID
+    pono,
+    fromCity,
+    toCity,
+    product,
+    customer,
+    quantity,
+    transporter,
+    transporterUnqids,
+    vehicle,
+    vehicleType,
+    driverName,
+    driverMobile,
+    freight,
+    loadingDate
+} = req.body;
 
 
         console.log(
@@ -357,6 +353,12 @@ console.log('==========================================');
                     sql.UniqueIdentifier,
                     poUnqid
                 )
+
+                .input(
+    'POCHILDUNQID',
+    sql.UniqueIdentifier,
+    poChildUnqid
+)
 
                 .input(
                     'PONO',
