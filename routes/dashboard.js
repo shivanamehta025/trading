@@ -446,12 +446,17 @@ router.post("/customer-due-bills", async (req, res) => {
 
 router.post("/customer-due-bills_dashboard", async (req, res) => {
   try {
-    const { databaseName, customerUnq } = req.body;
+    const { databaseName, customerUnq, what = "CUSTOMER_DUE_BILLS" } = req.body;
+     const allowedWhat = [
+  "CUSTOMER_DUE_BILLS",
+  "CUSTOMER_ALL_BILLS"
+];
 
     const pool = await getPool(databaseName);
+   
 
     const result = await pool.request()
-      .input("WHAT", sql.VarChar, "CUSTOMER_DUE_BILLS")
+       .input("WHAT", sql.VarChar, what)
       .input("CUSTOMERUNQ", sql.VarChar, customerUnq)
       .execute("A_SP_FOR_DASHBOARD_APP");
 
