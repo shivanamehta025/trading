@@ -1611,56 +1611,62 @@ router.post('/update-transporter-mobile', async (req, res) => {
 });
 
 
+
 router.post('/send-freight-whatsapp', async (req, res) => {
   try {
     const {
       databaseName,
       notificationId,
       mobile,
-      parameters
+      parameters,
+      dynamicUrl1,
     } = req.body;
 
-    if (!databaseName || !mobile || !Array.isArray(parameters)) {
+    if (
+      !databaseName ||
+      !mobile ||
+      !Array.isArray(parameters) ||
+      !dynamicUrl1
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Database, mobile and parameter array are required'
+        message:
+          'Database, mobile, 9 template parameters and dynamicUrl1 are required',
       });
     }
 
     const YOURUID = process.env.M2M_UID;
     const API_ACCESS_TOKEN = process.env.M2M_TOKEN;
-    const PHONE_NUMBER_ID = process.env.M2M_PHONE_NUMBER_ID;
+    const PHONE_NUMBER_ID =
+      process.env.M2M_PHONE_NUMBER_ID;
 
     if (!YOURUID || !API_ACCESS_TOKEN || !PHONE_NUMBER_ID) {
       return res.status(500).json({
         success: false,
-        message: 'WhatsApp gateway config missing in .env'
+        message: 'WhatsApp gateway config missing in .env',
       });
     }
 
     // Normalize mobile number.
-   // Normalize mobile number
-let phoneNumber = String(mobile)
-  .replace(/\D/g, '')
-  .replace(/^0+/, '');
+    let phoneNumber = String(mobile)
+      .replace(/\D/g, '')
+      .replace(/^0+/, '');
 
-// If 10 digits, add India's country code
-if (phoneNumber.length === 10) {
-  phoneNumber = '91' + phoneNumber;
-}
+    if (phoneNumber.length === 10) {
+      phoneNumber = '91' + phoneNumber;
+    }
 
-// Validate the final number
-if (
-  phoneNumber.length < 11 ||
-  phoneNumber.length > 15
-) {
-  return res.status(400).json({
-    success: false,
-    message: 'Invalid mobile number',
-    mobile: phoneNumber
-  });
-}
-    // Clean template parameters.
+    if (
+      phoneNumber.length < 11 ||
+      phoneNumber.length > 15
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid mobile number',
+        mobile: phoneNumber,
+      });
+    }
+
     const cleanValue = (value) =>
       String(value ?? '')
         .replace(/[\n\r\t]+/g, ' ')
@@ -1669,16 +1675,16 @@ if (
 
     const parameterList = parameters.map(cleanValue);
 
-    // freight_inquiry requires exactly 10 variables.
+    // New freight_inquiry_with_button template has 9 body variables.
     if (
-      parameterList.length !== 10 ||
+      parameterList.length !== 9 ||
       parameterList.some((p) => !p)
     ) {
       return res.status(400).json({
         success: false,
         message:
-          'Exactly 10 non-empty freight template parameters are required',
-        parameters: parameterList
+          'Exactly 9 non-empty freight template parameters are required',
+        parameters: parameterList,
       });
     }
 
@@ -1688,12 +1694,17 @@ if (
     const requestBody = {
       from_phone_number_id: PHONE_NUMBER_ID,
       phone_number: phoneNumber,
-      template_name: 'freight_inquiry',
-      template_language: 'en_us',
+      template_name: 'freight_inquiry_with_button',
+      template_language: 'en_US',
       template_media_type: 'simple',
+
+      // Body variables only. The URL is NOT included here.
       parameters: parameterList
         .map((p) => `{${p.replace(/[,{}]/g, ' ')}}`)
-        .join(',')
+        .join(','),
+
+      // Dynamic URL suffix for the template's URL button.
+      dynamic_url_1: cleanValue(dynamicUrl1),
     };
 
     console.log('FREIGHT WHATSAPP ENQUIRY:', notificationId);
@@ -1707,15 +1718,21 @@ if (
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_ACCESS_TOKEN}`
+        Authorization: `Bearer ${API_ACCESS_TOKEN}`,
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
     });
 
     const whatsappText = await whatsappResponse.text();
 
-    console.log('FREIGHT WHATSAPP STATUS:', whatsappResponse.status);
-    console.log('FREIGHT WHATSAPP RESPONSE:', whatsappText);
+    console.log(
+      'FREIGHT WHATSAPP STATUS:',
+      whatsappResponse.status
+    );
+    console.log(
+      'FREIGHT WHATSAPP RESPONSE:',
+      whatsappText
+    );
 
     let gatewayData;
 
@@ -1729,7 +1746,8 @@ if (
       !whatsappResponse.ok ||
       gatewayData?.error ||
       gatewayData?.success === false ||
-      gatewayData?.status === 'error';
+      gatewayData?.status === 'error' ||
+      gatewayData?.result === 'failed';
 
     if (gatewayFailed) {
       return res.status(502).json({
@@ -1739,27 +1757,28 @@ if (
           gatewayData?.message ||
           'Freight WhatsApp gateway failed',
         gatewayStatus: whatsappResponse.status,
-        gatewayResponse: gatewayData || whatsappText
+        gatewayResponse: gatewayData || whatsappText,
       });
     }
 
     return res.json({
       success: true,
-      message: 'Freight enquiry WhatsApp request sent successfully',
+      message:
+        'Freight enquiry WhatsApp template request sent successfully',
       notificationId,
       mobile: phoneNumber,
-      gatewayResponse: gatewayData || whatsappText
+      gatewayResponse: gatewayData || whatsappText,
     });
-
   } catch (err) {
     console.error('SEND FREIGHT WHATSAPP ERROR:', err);
 
     return res.status(500).json({
       success: false,
-      message: err.message
+      message: err.message,
     });
   }
 });
+
 
 
 // ============================================================
