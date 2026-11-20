@@ -787,14 +787,22 @@ router.post('/rate-whatsapp-data', async (req, res) => {
     }
 
     const products = rows
-      .map((r) => {
+    .map((r) => {
         const rate = parseFloat(r.CASHAMT);
+        const quantity = parseFloat(r.QUANTITY);
+
         return {
-          product: r.PRODUCT?.toString().trim() ?? '',
-          cashRate: Number.isFinite(rate) ? String(rate) : '0',
+        product: r.PRODUCT?.toString().trim() ?? '',
+        quantity: Number.isFinite(quantity) ? String(quantity) : '0',
+        cashRate: Number.isFinite(rate) ? String(rate) : '0',
         };
-      })
-      .filter((p) => p.product && parseFloat(p.cashRate) > 0);
+    })
+    .filter(
+        (p) =>
+        p.product &&
+        parseFloat(p.cashRate) > 0 &&
+        parseFloat(p.quantity) > 0
+    );
 
     return res.json({
       success: true,
